@@ -1,3 +1,18 @@
+/*
+Purpose: This modal component provides a comprehensive form for editing existing tasks, allowing users to modify title, description, due dates, tags, and urgency status.
+
+Variables Summary:
+- isOpen: Boolean indicating if the modal is open.
+- onClose: Function to close the modal.
+- onTaskChange: Function to update the task object with new values.
+- tags: Array of all available tags for selection.
+- onToggleTag: Function to toggle a tag's selection for the task.
+- onSubmit: Function to handle form submission and save changes.
+- values: EditTaskModalState object containing the modal status and the task being edited.
+
+These variables manage the editing state and form interactions for task modification.
+*/
+
 import React from 'react';
 import { X, Calendar, Clock, AlertCircle } from 'lucide-react';
 import {  Tag, EditTaskModalState, Task } from '@/app/types/task';

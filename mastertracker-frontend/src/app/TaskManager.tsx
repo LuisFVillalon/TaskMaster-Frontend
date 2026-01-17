@@ -1,3 +1,23 @@
+/*
+Purpose: This file contains the main TaskManager component, which serves as the root component 
+for the task management application. It integrates various hooks and components to display tasks, 
+handle user interactions, and manage application state.
+
+Variables Summary:
+- tasks: Array of task objects fetched from the backend, used to display the task list.
+- isLoading: Boolean indicating if tasks are being loaded, used for loading spinner.
+- toggleComplete, addTask, deleteTask, updateTask, setTasks: Functions from useTasks hook for CRUD operations on tasks.
+- tags: Array of tag objects, used for tagging tasks.
+- tagsLoading: Boolean for tag loading state.
+- addTag, delTag, updateTag: Functions for tag management CRUD operations on tag.
+- state: Object from useTaskManagerState containing UI state variables like modals visibility, form data, filters.
+- handlers: Object from useTaskHandlers providing event handlers for user actions.
+- filteredTasks: Filtered and sorted array of tasks based on current filters.
+- stats: Object with statistics like total, active, completed tasks.
+
+These variables are used to render the UI components and handle user interactions throughout the component.
+*/
+
 'use client';
 
 import React from 'react';
@@ -13,7 +33,6 @@ import EditTaskModal from '@/app/components/task/EditTaskModal';
 import CreateTagModal from '@/app/components/tag/CreateTagModal';
 import EditTagModal from '@/app/components/tag/EditTagListModal';
 import { Filter } from 'lucide-react';
-
 
 const TaskManager: React.FC = () => {
   const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks } = useTasks();

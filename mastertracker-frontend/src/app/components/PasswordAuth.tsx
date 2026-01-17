@@ -1,3 +1,15 @@
+/*
+Purpose: This component handles password-based authentication for the application, validating the entered password against an environment variable and managing the login flow.
+
+Variables Summary:
+- password: String state holding the user's entered password.
+- error: String state for displaying error messages (e.g., incorrect password or config issues).
+- isLoading: Boolean state indicating if the authentication is in progress.
+- onAuthenticated: Function prop called when authentication succeeds to notify the parent component.
+
+These variables are used to manage the form state, validate input, and provide user feedback during the authentication process.
+*/
+
 import React, { useState } from 'react';
 import { Lock } from 'lucide-react';
 

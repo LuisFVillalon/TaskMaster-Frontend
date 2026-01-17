@@ -1,3 +1,16 @@
+/*
+Purpose: This file contains utility functions for formatting and processing task-related data, including date/time formatting, color determination, and statistics calculation.
+
+Variables Summary:
+- formatDueTime: Function to format time strings or Date objects into readable time format.
+- formatDueDate: Function to format dates into relative terms like "Today", "Tomorrow", or specific dates.
+- getDueDateColor: Function to determine text color based on due date urgency.
+- getTaskDateTime: Function to get a timestamp for sorting tasks by due date/time.
+- countTasksByTag: Function to count occurrences of each tag across tasks.
+
+These utilities are used throughout the application for displaying and sorting task information.
+*/
+
 import { Task } from '@/app/types/task';
 
 export const formatDueTime = (

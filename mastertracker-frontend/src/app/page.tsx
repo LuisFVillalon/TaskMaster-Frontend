@@ -1,9 +1,24 @@
+/*
+Purpose: This file contains the main page component for the application, responsible for 
+handling user authentication and conditionally rendering the TaskManager or PasswordAuth component.
+
+Variables Summary:
+- isAuthenticated: Boolean state indicating if the user has been authenticated, checked from localStorage.
+- isLoading: Boolean state for the initial loading phase while checking authentication.
+- handleAuthenticated: Function that sets isAuthenticated to true when login succeeds.
+
+These variables manage the authentication flow, showing a loading spinner initially, the auth form if not authenticated, or the main TaskManager if authenticated.
+*/
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import TaskManager from "./TaskManager";
 import PasswordAuth from "./components/PasswordAuth";
 
+// Home page, asks user for a password to access the web application. 
+// isLoading is the loading status
+// isAunthenticated dictates if the user can access the web app
 export default function Page() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -11,6 +26,7 @@ export default function Page() {
   useEffect(() => {
     // Check if user is already authenticated
     const authenticated = localStorage.getItem('taskmaster_authenticated') === 'true';
+  // eslint-disable-next-line react-hooks/set-state-in-effect    
     setIsAuthenticated(authenticated);
     setIsLoading(false);
   }, []);

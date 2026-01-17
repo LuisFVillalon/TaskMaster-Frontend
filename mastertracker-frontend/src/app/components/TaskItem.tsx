@@ -1,3 +1,17 @@
+/*
+Purpose: This component renders an individual task item in the task list, displaying task details, tags, due dates, and providing buttons for editing, deleting, and toggling completion.
+
+Variables Summary:
+- task: Task object containing title, description, completion status, due date, tags, etc.
+- index: Number used for staggered animation delay in the list.
+- onToggleComplete: Function to toggle the task's completion status.
+- tags: Array of tag objects used to look up colors for displaying task tags.
+- onDeleteTask: Function to delete the task.
+- onEditTaskClick: Function to open the edit modal with the task data.
+
+These variables are used to display task information and handle user interactions like completion toggle, edit, and delete.
+*/
+
 import React from 'react';
 import { Check, Clock, AlertCircle, Trash2, Pencil } from 'lucide-react';
 import { Task } from '@/app/types/task';

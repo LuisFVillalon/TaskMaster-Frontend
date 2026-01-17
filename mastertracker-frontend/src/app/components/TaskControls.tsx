@@ -1,3 +1,22 @@
+/*
+Purpose: This component provides the control panel for task management, including search input, filter buttons, tag selection dropdown, and buttons for creating new tasks and tags.
+
+Variables Summary:
+- searchTerm: String for the current search query.
+- onSearchChange: Function to update the search term.
+- filter: Current filter type (all, active, completed, urgent).
+- sortOrder: Object mapping filter types to sort direction (asc/desc).
+- onFilterChange: Function to change the filter and toggle sort.
+- selectedTags: Array of currently selected tags for filtering.
+- onTagToggle: Function to toggle a tag's selection.
+- showTagDropdown: Boolean for dropdown visibility.
+- onTagDropdownToggle: Function to toggle dropdown.
+- tags: Array of all available tags.
+- onNewTaskClick, onCreateTagClick, onEditTagClick: Functions for button actions.
+
+These variables are used to manage the UI state and handle user interactions for searching, filtering, and creating tasks/tags.
+*/
+
 import React from 'react';
 import { Plus, Search, Filter } from 'lucide-react';
 import { FilterType, Tag } from '@/app/types/task';

@@ -1,3 +1,16 @@
+/*
+Purpose: This modal component provides a form for creating new tags, allowing users to enter a tag name and select a color from predefined options. (Note: This appears to be a duplicate of CreateTagModal.tsx)
+
+Variables Summary:
+- isOpen: Boolean indicating if the modal is visible.
+- onClose: Function to close the modal.
+- newTag: NewTagForm object containing the name and color of the tag being created.
+- onTagChange: Function to update the newTag object as the user types or selects.
+- onSubmit: Function to handle form submission and create the tag.
+
+These variables manage the modal state and form data for tag creation.
+*/
+
 import React from 'react';
 import { X } from 'lucide-react';
 import { NewTagForm } from '@/app/types/task';

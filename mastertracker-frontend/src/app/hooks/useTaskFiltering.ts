@@ -1,3 +1,18 @@
+/*
+Purpose: This custom hook filters and sorts tasks based on status, search term, and selected tags, and computes statistics for different task categories.
+
+Variables Summary:
+- tasks: Array of all task objects to be filtered and analyzed.
+- filter: Current filter type (all, active, completed, urgent).
+- sortOrder: Object mapping each filter type to its sort direction (asc/desc).
+- searchTerm: String used to filter tasks by title or description.
+- selectedTags: Array of tags that tasks must match (if any are selected).
+
+Returns an object with filteredTasks (sorted and filtered array) and stats (statistics for total, active, completed, urgent tasks).
+
+These variables are used to dynamically filter and sort the task list and generate stats for the UI.
+*/
+
 import { useMemo } from 'react';
 import { FilterType, StatsData, Tag, Task } from '@/app/types/task';
 import { countTasksByTag, getTaskDateTime } from '@/app/utils/taskUtils';

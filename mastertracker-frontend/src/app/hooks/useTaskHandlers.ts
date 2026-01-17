@@ -1,3 +1,17 @@
+/*
+Purpose: This custom hook provides event handlers for managing tasks and tags, including creation, 
+editing, deletion, and UI state changes.
+
+Variables Summary:
+- setShowNewTaskModal, setNewTask, etc.: State setter functions for UI modals and forms.
+- newTask, showEditTaskModal, newTag, filter, sortOrder, selectedTags: Current state values.
+- addTask, updateTask, addTag, updateTag, delTag: API functions for CRUD operations.
+
+Returns an object with handler functions like handleCreateTask, handleEditTask, toggleSelectedTag, etc.
+
+These variables and handlers manage all user interactions related to task and tag management.
+*/
+
 import React from 'react';
 import { FilterType, NewTaskForm, EditTaskForm, Tag, EditTaskModalState, Task } from '@/app/types/task';
 

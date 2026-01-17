@@ -1,3 +1,19 @@
+/*
+Purpose: This file contains API utility functions for communicating with the backend server, 
+handling CRUD operations for tasks and tags.
+
+Variables Summary:
+- API_BASE_URL: Base URL for the backend API, sourced from NEXT_PUBLIC_TASKMASTER_DB_URL environment variable.
+
+Functions include:
+- fetchTasks, fetchTags: GET requests to retrieve data.
+- createTask, createTag: POST requests to create new items.
+- onDelete, onDeleteTag: DELETE requests to remove items.
+- updateCompleteTask, updateWholeTask, updateTag, onUpdateTag: PATCH/PUT requests to update items.
+
+These functions handle all HTTP interactions with the backend API.
+*/
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_TASKMASTER_DB_URL!;
 
 export async function fetchTasks() {

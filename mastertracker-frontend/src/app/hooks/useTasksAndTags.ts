@@ -1,3 +1,14 @@
+/*
+Purpose: This file contains custom hooks for managing tasks and tags data, including fetching from 
+API, and performing CRUD operations.
+
+Variables Summary:
+- useTasks: Manages task data with tasks array, isLoading boolean, and functions like toggleComplete, addTask, deleteTask, updateTask.
+- useTags: Manages tag data with tags array, tagsLoading boolean, and functions like addTag, delTag, updateTag.
+
+These hooks handle all data operations and state management for tasks and tags, interfacing with the backend API.
+*/
+
 import { useState, useEffect } from 'react';
 import { fetchTasks, 
     fetchTags, 

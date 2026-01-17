@@ -1,3 +1,14 @@
+/*
+Purpose: This component displays a statistics card showing the count of tasks and their associated tags for a given category (e.g., Total, Active).
+
+Variables Summary:
+- title: String prop for the title of the stats card (e.g., "Total", "Active").
+- stats: TaskStats object containing an array of tasks and an array of tags with counts.
+- color: Optional string prop for the color used in the count display, defaults to blue.
+
+These variables are used to render the card with the task count in the specified color and a grid of tags showing their names and counts.
+*/
+
 import React from 'react';
 import { TaskStats } from '@/app/types/task';
 

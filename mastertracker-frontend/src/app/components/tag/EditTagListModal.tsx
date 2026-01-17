@@ -1,3 +1,22 @@
+/*
+Purpose: This modal component allows users to manage existing tags by editing their names and colors, or deleting them with confirmation dialogs.
+
+Variables Summary:
+- isOpen: Boolean for modal visibility.
+- onClose: Function to close the modal.
+- tag: Unused prop (possibly legacy).
+- onTagChange: Unused prop.
+- allTags: Array of all tags to display and manage.
+- onDeleteTag: Function to delete a tag.
+- onEditTag: Function to update a tag.
+- deletingTag: Local state for the tag being deleted (confirmation modal).
+- editingTag: Local state for the tag being edited.
+- editedName: Local state for the edited tag name.
+- editedColor: Local state for the edited tag color.
+
+These variables handle the state for editing and deleting tags within the modal.
+*/
+
 import React, { useState } from 'react';
 import { X, Trash2, Pencil } from 'lucide-react';
 import { Tag } from '@/app/types/task';

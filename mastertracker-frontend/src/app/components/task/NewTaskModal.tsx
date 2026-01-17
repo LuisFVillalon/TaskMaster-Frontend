@@ -1,3 +1,18 @@
+/*
+Purpose: This modal component provides a form for creating new tasks, allowing users to enter title, description, due dates, select tags, and mark as urgent.
+
+Variables Summary:
+- isOpen: Boolean indicating if the modal is open.
+- onClose: Function to close the modal.
+- newTask: NewTaskForm object containing the form data for the new task.
+- onTaskChange: Function to update the newTask object with user input.
+- tags: Array of available tags for selection.
+- onToggleTag: Function to toggle a tag's selection for the new task.
+- onSubmit: Function to handle form submission and create the task.
+
+These variables manage the form state for creating new tasks.
+*/
+
 import React from 'react';
 import { X, Calendar, Clock, AlertCircle } from 'lucide-react';
 import { NewTaskForm, Tag } from '@/app/types/task';
