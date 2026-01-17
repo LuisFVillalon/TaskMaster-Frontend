@@ -33,6 +33,8 @@ import EditTaskModal from '@/app/components/task/EditTaskModal';
 import CreateTagModal from '@/app/components/tag/CreateTagModal';
 import EditTagModal from '@/app/components/tag/EditTagListModal';
 import { Filter } from 'lucide-react';
+import Image from 'next/image';
+
 
 const TaskManager: React.FC = () => {
   const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks } = useTasks();
@@ -91,10 +93,21 @@ const TaskManager: React.FC = () => {
       <div className="min-h-screen bg-[#EFE7DD]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
           {/* Header */}
-          <div className="mb-6 sm:mb-8 flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-2">Tasks</h1>
-              <p className="text-sm sm:text-base text-gray-600">Manage your work, stay productive</p>
+          <div className="mb-6 sm:mb-8 flex justify-between items-center">
+            <div className="flex justify-center items-center">
+              <div className="flex items-center">
+                <Image
+                  src="/icon.svg"
+                  alt="Favicon"
+                  width={100}
+                  height={100}
+                  className="mr-2"
+                />
+              </div>
+              <div>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900">Task Master</h1>
+                <p className="text-sm sm:text-base text-gray-600">Manage your work, stay productive</p>
+              </div>
             </div>
             <button
               onClick={() => {
