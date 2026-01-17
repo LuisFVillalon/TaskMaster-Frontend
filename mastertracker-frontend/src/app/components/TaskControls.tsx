@@ -15,6 +15,7 @@ interface TaskControlsProps {
   tags: Tag[];
   onNewTaskClick: () => void;
   onCreateTagClick: () => void;
+  onEditTagClick: () => void;
 }
 
 const TaskControls: React.FC<TaskControlsProps> = ({
@@ -29,7 +30,8 @@ const TaskControls: React.FC<TaskControlsProps> = ({
   onTagDropdownToggle,
   tags,
   onNewTaskClick,
-  onCreateTagClick
+  onCreateTagClick,
+  onEditTagClick
 }) => {
   return (
     <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 mb-4 sm:mb-6">
@@ -61,6 +63,13 @@ const TaskControls: React.FC<TaskControlsProps> = ({
           >
             + Create Tag
           </button>
+          <button
+            type="button"
+            onClick={onEditTagClick}
+            className=" flex-row justify-center items-center px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm"
+          >
+           ✏️ Edit Tag
+          </button>          
         </div>
       </div>
 

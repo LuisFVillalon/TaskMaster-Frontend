@@ -1,4 +1,9 @@
 // Types matching the Python Task model
+export interface EditTaskModalState {
+  status: boolean;
+  task: Task | null;
+};
+
 export interface Tag {
   id: number;
   name: string;
@@ -24,6 +29,16 @@ export interface NewTaskForm {
   urgent: boolean;
   due_date: string;
   due_time: string;
+  tags: Tag[];
+}
+
+export interface EditTaskForm {
+  title: string;
+  description: string;
+  urgent: boolean;
+  due_date: string;
+  due_time: string;
+  completed: boolean;
   tags: Tag[];
 }
 

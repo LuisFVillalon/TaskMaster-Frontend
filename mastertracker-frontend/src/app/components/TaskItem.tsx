@@ -8,9 +8,21 @@ interface TaskItemProps {
   index: number;
   onToggleComplete: (id: number) => void;
   tags: Array<{ id: number; name: string; color: string }>;
+  onDeleteTask: (task: Task) => void;
+  onEditTaskClick: (params: { status: boolean; task: Task }) => void;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags, onDeleteTask, onEditTaskClick }) => {
+    const handleDeleteTask = async (taskToDelete: Task) => {
+        onDeleteTask(taskToDelete);
+    };
+    const handleEditTask = async (  { status, taskToEdit }: { status: boolean; taskToEdit: Task }
+    ) => {
+        onEditTaskClick({
+            status,
+            task: taskToEdit,
+        });
+    };    
   return (
     <div
       className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-[0.99]"
@@ -50,7 +62,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
 
                 {/* Edit button */}
                 <button
-                onClick={() => onEdit(task)}
+                    onClick={() =>
+                    handleEditTask({
+                        status: true,
+                        taskToEdit: task,
+                    })
+                    }
                 className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition"
                 title="Edit task"
                 >
@@ -59,7 +76,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
 
                 {/* Delete button */}
                 <button
-                onClick={() => onDelete(task.id)}
+                onClick={() => handleDeleteTask(task)}
                 className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition"
                 title="Delete task"
                 >

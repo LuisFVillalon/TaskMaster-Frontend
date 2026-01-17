@@ -1,36 +1,36 @@
 import React from 'react';
 import { X, Calendar, Clock, AlertCircle } from 'lucide-react';
-import { NewTaskForm, Tag } from '@/app/types/task';
+import {  Tag, EditTaskModalState, Task } from '@/app/types/task';
 
-interface NewTaskModalProps {
+interface EditTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  newTask: NewTaskForm;
-  onTaskChange: (task: NewTaskForm) => void;
+  onTaskChange: (task: Task) => void;
   tags: Tag[];
   onToggleTag: (tag: Tag) => void;
   onSubmit: (e: React.FormEvent) => void;
+  values: EditTaskModalState;
 }
 
-const NewTaskModal: React.FC<NewTaskModalProps> = ({
+const EditTaskModal: React.FC<EditTaskModalProps> = ({
   isOpen,
   onClose,
-  newTask,
   onTaskChange,
   tags,
   onToggleTag,
-  onSubmit
+  onSubmit,
+  values
 }) => {
   if (!isOpen) return null;
-
+  if (!values.task) return null;
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-fadeIn">
       <div
-        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        className="border-blue-600 border-4 bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
         style={{ animation: 'slideUp 0.3s ease-out' }}
       >
         <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-2xl font-bold text-gray-900">Create New Task</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Edit Task</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -38,7 +38,6 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-
         <form onSubmit={onSubmit} className="p-6 space-y-5">
           {/* Title */}
           <div>
@@ -48,8 +47,8 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
             <input
               type="text"
               required
-              value={newTask.title}
-              onChange={(e) => onTaskChange({ ...newTask, title: e.target.value })}
+              value={values.task.title}
+              onChange={(e) => onTaskChange({ ...values.task!, title: e.target.value })}
               placeholder="Enter task title"
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-black"
             />
@@ -61,8 +60,8 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
               Description
             </label>
             <textarea
-              value={newTask.description}
-              onChange={(e) => onTaskChange({ ...newTask, description: e.target.value })}
+              value={values.task.description}
+              onChange={(e) => onTaskChange({ ...values.task!, description: e.target.value })}
               placeholder="Add task details..."
               rows={3}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none text-black"
@@ -79,8 +78,10 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="date"
-                  value={newTask.due_date}
-                  onChange={(e) => onTaskChange({ ...newTask, due_date: e.target.value })}
+                  value={values.task?.due_date
+                    ? new Date(values.task.due_date).toISOString().slice(0, 10)
+                    : ""}
+                  onChange={(e) => onTaskChange({ ...values.task!, due_date: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-black"
                 />
               </div>
@@ -93,8 +94,12 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                 <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="time"
-                  value={newTask.due_time}
-                  onChange={(e) => onTaskChange({ ...newTask, due_time: e.target.value })}
+                  value={
+                    values.task?.due_time instanceof Date 
+                      ? values.task.due_time.toISOString().slice(0, 16) 
+                      : (values.task?.due_time ?? '')
+                  }
+                  onChange={(e) => onTaskChange({ ...values.task!, due_time: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-black"
                 />
               </div>
@@ -108,17 +113,15 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4 border border-gray-300 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
               {tags.map((tag) => {
-                const selected = newTask.tags.some(t => t.id === tag.id);
-
+                const selected = values.task?.tags?.some(t => t.id === tag.id) ?? false;
                 return (
                   <button
                     key={tag.id}
                     type="button"
                     onClick={() => onToggleTag(tag)}
                     style={{
-                      backgroundColor: selected ? tag.color :'#ffffff',
+                      backgroundColor: selected ? tag.color :'#F5F1EB',
                       color: selected ? '#ffffff':'#000000',
-                      border: selected ? '2px solid #000000' : `1px solid ${tag.color}`,
                       transform: selected ? 'scale(1)' : 'scale(0.95)',
                     }}
                     className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-100 active:scale-90"
@@ -128,10 +131,10 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                 );
               })}
             </div>
-            {newTask.tags.length > 0 && (
+            {values.task?.tags.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 <span className="text-xs text-gray-600">Selected:</span>
-                {newTask.tags.map((tag) => {
+                {values.task.tags.map((tag) => {
                   const tagData = tags.find(t => t.name === tag.name);
                   return (
                     <span
@@ -155,8 +158,8 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
             <input
               type="checkbox"
               id="urgent"
-              checked={newTask.urgent}
-              onChange={(e) => onTaskChange({ ...newTask, urgent: e.target.checked })}
+              checked={values.task.urgent}
+              onChange={(e) => onTaskChange({ ...values.task!, urgent: e.target.checked })}
               className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
             />
             <label htmlFor="urgent" className="text-sm font-medium text-gray-700 flex items-center gap-2">
@@ -178,7 +181,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
               type="submit"
               className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm"
             >
-              Create Task
+              Save Task
             </button>
           </div>
         </form>
@@ -187,4 +190,4 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
   );
 };
 
-export default NewTaskModal;
+export default EditTaskModal;

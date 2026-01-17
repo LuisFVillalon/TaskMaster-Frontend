@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
-import { fetchTasks, fetchTags, createTask, createTag } from "@/app/lib/api";
-import { Task, Tag, NewTaskForm, NewTagForm } from '@/app/types/task';
+import { fetchTasks, 
+    fetchTags, 
+    createTask, 
+    createTag, 
+    onDelete, 
+    onDeleteTag,
+    updateTag as updateTagApi,
+    updateCompleteTask, 
+    updateWholeTask 
+} from "@/app/lib/api";
+import { Task, Tag, NewTaskForm, NewTagForm, EditTaskForm } from '@/app/types/task';
 
 export const useTasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -27,30 +36,58 @@ export const useTasks = () => {
     setTasks(tasks.map(task =>
       task.id === id ? { ...task, completed: !task.completed } : task
     ));
+    updateCompleteStatus(id)
   };
 
   const addTask = async (newTask: NewTaskForm) => {
     try {
-      await createTask(newTask);
-
-      // Optimistically add to UI
-      const task: Task = {
-        id: Math.max(0, ...tasks.map(t => t.id)) + 1,
-        title: newTask.title,
-        description: newTask.description,
-        completed: false,
-        urgent: newTask.urgent,
-        due_date: newTask.due_date || null,
-        due_time: newTask.due_time || null,
-        tags: newTask.tags
-      };
-
-      setTasks([task, ...tasks]);
-      return true;
+        const createdTask = await createTask(newTask);
+        setTasks([createdTask, ...tasks]);
+        return true;
     } catch (err) {
-      console.error(err);
-      alert("Failed to create task");
-      return false;
+        console.error(err);
+        alert("Failed to create task");
+        return false;
+    }
+  };
+
+  const deleteTask = async (delTask: Task) => {
+    
+    try {
+        await onDelete(delTask.id);
+        setTasks(prev =>
+            prev.filter(task => task.id !== delTask.id)
+        );
+        return true;
+    } catch (err) {
+        console.error('Delete failed:', err);
+        alert("Failed to delete task");
+        return false;
+    }
+  };
+
+  const updateCompleteStatus = async (id_task: number) => {
+    
+    try {
+        await updateCompleteTask(id_task);
+        return true;
+    } catch (err) {
+        console.error('Delete failed:', err);
+        alert("Failed to update complete status on task");
+        return false;
+    }
+  };
+
+  const updateTask = async (id: number, updatedTask: EditTaskForm) => {
+    try {
+        const updated = await updateWholeTask(id, updatedTask) as Task;
+        console.log(updatedTask)
+        setTasks(prev => prev.map(task => task.id === id ? updated : task));
+        return true;
+    } catch (err) {
+        console.error(err);
+        alert("Failed to update task");
+        return false;
     }
   };
 
@@ -59,7 +96,9 @@ export const useTasks = () => {
     isLoading,
     toggleComplete,
     addTask,
-    setTasks
+    setTasks,
+    deleteTask,
+    updateTask,
   };
 };
 
@@ -104,10 +143,42 @@ export const useTags = () => {
     }
   };
 
+  const delTag = async (delTag: Tag) => {
+    
+    try {
+        console.log(delTag)
+        await onDeleteTag(delTag.id);
+        setTags(prev =>
+            prev.filter(task => task.id !== delTag.id)
+        );
+        return delTag.id;
+    } catch (err) {
+        console.error('Delete failed:', err);
+        alert("Failed to delete tag");
+        return null;
+    }
+  };
+
+  const updateTag = async (tagToUpdate: Tag) => {
+    
+    try {
+        await updateTagApi(tagToUpdate.id, { name: tagToUpdate.name, color: tagToUpdate.color });
+        setTags(prev =>
+            prev.map(tag => tag.id === tagToUpdate.id ? tagToUpdate : tag)
+        );
+        return tagToUpdate.id;
+    } catch (err) {
+        console.error('Update failed:', err);
+        alert("Failed to update tag");
+        return null;
+    }
+  };
   return {
     tags,
     tagsLoading,
     addTag,
+    delTag,
+    updateTag,
     setTags
   };
 };

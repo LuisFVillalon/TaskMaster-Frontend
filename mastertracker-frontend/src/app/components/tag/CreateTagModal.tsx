@@ -21,7 +21,7 @@ const CreateTagModal: React.FC<CreateTagModalProps> = ({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full">
+      <div className="border-blue-600 border-4 bg-white rounded-2xl shadow-xl max-w-sm w-full">
         <div className="px-5 py-4 border-b flex justify-between items-center">
           <h3 className="text-lg text-black font-semibold">Create A Tag</h3>
           <button onClick={onClose}>
@@ -64,8 +64,9 @@ const CreateTagModal: React.FC<CreateTagModalProps> = ({
                 <option value="#DC2626">Red</option>
                 <option value="#7C3AED">Purple</option>
                 <option value="#DB2777">Pink</option>
-                <option value="#F0E442">Yellow</option>
+                <option value="#D4B84A">Yellow</option>
                 <option value="#000000">Black</option>
+                <option value="#374151">Gray</option>
               </select>
             </div>
 
@@ -93,7 +94,7 @@ const CreateTagModal: React.FC<CreateTagModalProps> = ({
                 type="submit"
                 className="flex-1 bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700"
               >
-                Create
+                Create Tag
               </button>
             </div>
           </div>

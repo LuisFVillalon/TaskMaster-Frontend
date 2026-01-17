@@ -1,164 +1,61 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useTasks, useTags } from '@/app/hooks/useTasksAndTags';
-import { countTasksByTag, getTaskDateTime } from '@/app/utils/taskUtils';
-import { FilterType, StatsData, NewTaskForm, NewTagForm, Tag } from '@/app/types/task';
+import { useTaskManagerState } from '@/app/hooks/useTaskManagerState';
+import { useTaskHandlers } from '@/app/hooks/useTaskHandlers';
+import { useTaskFiltering } from '@/app/hooks/useTaskFiltering';
 import StatsCard from '@/app/components/StatsCard';
 import TaskItem from '@/app/components/TaskItem';
 import TaskControls from '@/app/components/TaskControls';
-import NewTaskModal from '@/app/components/NewTaskModal';
-import CreateTagModal from '@/app/components/CreateTagModal';
+import NewTaskModal from '@/app/components/task/NewTaskModal';
+import EditTaskModal from '@/app/components/task/EditTaskModal';
+import CreateTagModal from '@/app/components/tag/CreateTagModal';
+import EditTagModal from '@/app/components/tag/EditTagListModal';
 import { Filter } from 'lucide-react';
 
 
-
 const TaskManager: React.FC = () => {
-  const { tasks, isLoading, toggleComplete, addTask } = useTasks();
-  const { tags, tagsLoading, addTag } = useTags();
+  const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks } = useTasks();
+  const { tags, tagsLoading, addTag, delTag, updateTag } = useTags();
 
-  const [sortOrder, setSortOrder] = useState<Record<FilterType, 'asc' | 'desc'>>({
-    all: 'asc',
-    active: 'asc',
-    completed: 'asc',
-    urgent: 'asc',
+  // State management
+  const state = useTaskManagerState();
+
+  // Handlers
+  const handlers = useTaskHandlers({
+    setShowNewTaskModal: state.setShowNewTaskModal,
+    setNewTask: state.setNewTask,
+    setShowEditTaskModal: state.setShowEditTaskModal,
+    setShowCreateTagModal: state.setShowCreateTagModal,
+    setNewTag: state.setNewTag,
+    setEditingTag: state.setEditingTag,
+    setShowEditTagModal: state.setShowEditTagModal,
+    setTasks,
+    setSortOrder: state.setSortOrder,
+    setSelectedTags: state.setSelectedTags,
+    setFilter: state.setFilter,
+    newTask: state.newTask,
+    showEditTaskModal: state.showEditTaskModal,
+    newTag: state.newTag,
+    filter: state.filter,
+    sortOrder: state.sortOrder,
+    selectedTags: state.selectedTags,
+    addTask,
+    updateTask,
+    addTag,
+    updateTag,
+    delTag,
   });
-  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
-  const [showTagDropdown, setShowTagDropdown] = useState(false);
-  const [filter, setFilter] = useState<FilterType>('all');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [showNewTaskModal, setShowNewTaskModal] = useState(false);
-  const [showCreateTagModal, setShowCreateTagModal] = useState(false);
-  const [newTag, setNewTag] = useState<NewTagForm>({
-    name: '',
-    color: '#3B82F6'
-  });
-  const [newTask, setNewTask] = useState<NewTaskForm>({
-    title: '',
-    description: '',
-    urgent: false,
-    due_date: '',
-    due_time: '',
-    tags: []
-  });
 
-  const toggleSelectedTag = (tag: Tag) => {
-    setSelectedTags(prev =>
-      prev.some(t => t.id === tag.id)
-        ? prev.filter(t => t.id !== tag.id)
-        : [...prev, tag]
-    );
-  };
-
-  const handleCreateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const success = await addTask(newTask);
-    if (success) {
-      setShowNewTaskModal(false);
-      setNewTask({
-        title: '',
-        description: '',
-        urgent: false,
-        due_date: '',
-        due_time: '',
-        tags: []
-      });
-      alert("Task created successfully!");
-    }
-  };
-
-  const handleCreateTag = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const tag = await addTag(newTag);
-    if (tag) {
-      setNewTask(prev => ({
-        ...prev,
-        tags: [...prev.tags, tag]
-      }));
-
-      setNewTag({ name: '', color: '#3B82F6' });
-      setShowCreateTagModal(false);
-    }
-  };
-
-  const toggleTag = (tag: Tag) => {
-    setNewTask(prev => {
-      const exists = prev.tags.some(t => t.id === tag.id);
-
-      return {
-        ...prev,
-        tags: exists
-          ? prev.tags.filter(t => t.id !== tag.id)
-          : [...prev.tags, tag]
-      };
-    });
-  };
-
-  const handleFilterChange = (newFilter: FilterType) => {
-    if (filter === newFilter) {
-      // Same filter clicked → toggle sort
-      setSortOrder(prev => ({
-        ...prev,
-        [newFilter]: prev[newFilter] === 'asc' ? 'desc' : 'asc'
-      }));
-    } else {
-      // New filter → set filter
-      setFilter(newFilter);
-    }
-  };
-
-  const filteredTasks = Array.isArray(tasks)
-    ? tasks
-        .filter(task => {
-          const matchesStatus =
-            filter === 'all'
-              ? true
-              : filter === 'active'
-              ? !task.completed
-              : filter === 'completed'
-              ? task.completed
-              : filter === 'urgent'
-              ? task.urgent && !task.completed
-              : true;
-
-          const matchesSearch =
-            task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            task.description.toLowerCase().includes(searchTerm.toLowerCase());
-
-          const matchesTags =
-            selectedTags.length === 0 ||
-            task.tags.some(taskTag =>
-              selectedTags.some(selected => selected.id === taskTag.id)
-            );
-
-
-          return matchesStatus && matchesSearch && matchesTags;
-        })
-        .sort((a, b) => {
-          const diff = getTaskDateTime(a) - getTaskDateTime(b);
-          return sortOrder[filter] === 'asc' ? diff : -diff;
-        })
-    : [];
-  const stats: StatsData = {
-    total: {
-      tasks: tasks,
-      tags: countTasksByTag(tasks)
-    },
-    active: {
-      tasks: tasks.filter(t => !t.completed),
-      tags: countTasksByTag(tasks.filter(t => !t.completed))
-    },
-    completed: {
-      tasks: tasks.filter(t => t.completed),
-      tags: countTasksByTag(tasks.filter(t => t.completed))
-    },
-    urgent: {
-      tasks: tasks.filter(t => t.urgent && !t.completed),
-      tags: countTasksByTag(tasks.filter(t => t.urgent && !t.completed))
-    }
-  };
+  // Filtering and stats
+  const { filteredTasks, stats } = useTaskFiltering(
+    tasks,
+    state.filter,
+    state.sortOrder,
+    state.searchTerm,
+    state.selectedTags
+  );
   if (isLoading || tagsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
@@ -172,12 +69,23 @@ const TaskManager: React.FC = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="min-h-screen bg-[#EFE7DD]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
           {/* Header */}
-          <div className="mb-6 sm:mb-8">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-2">Tasks</h1>
-            <p className="text-sm sm:text-base text-gray-600">Manage your work, stay productive</p>
+          <div className="mb-6 sm:mb-8 flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-2">Tasks</h1>
+              <p className="text-sm sm:text-base text-gray-600">Manage your work, stay productive</p>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.removeItem('taskmaster_authenticated');
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              Logout
+            </button>
           </div>
 
           {/* Stats Cards - Mobile First Grid */}
@@ -189,18 +97,23 @@ const TaskManager: React.FC = () => {
           </div>
 
           <TaskControls
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            filter={filter}
-            sortOrder={sortOrder}
-            onFilterChange={handleFilterChange}
-            selectedTags={selectedTags}
-            onTagToggle={toggleSelectedTag}
-            showTagDropdown={showTagDropdown}
-            onTagDropdownToggle={() => setShowTagDropdown(prev => !prev)}
+            searchTerm={state.searchTerm}
+            onSearchChange={state.setSearchTerm}
+            filter={state.filter}
+            sortOrder={state.sortOrder}
+            onFilterChange={handlers.handleFilterChange}
+            selectedTags={state.selectedTags}
+            onTagToggle={handlers.toggleSelectedTag}
+            showTagDropdown={state.showTagDropdown}
+            onTagDropdownToggle={() => state.setShowTagDropdown(prev => !prev)}
             tags={tags}
-            onNewTaskClick={() => setShowNewTaskModal(true)}
-            onCreateTagClick={() => setShowCreateTagModal(true)}
+            onNewTaskClick={() => state.setShowNewTaskModal(true)}
+            onCreateTagClick={() => state.setShowCreateTagModal(true)}
+            onEditTagClick={() => {
+              if (tags.length > 0) {
+                handlers.openEditTagModal(tags[0]); // For now, edit the first tag
+              }
+            }}
           />
 
           {/* Task List - Mobile Optimized */}
@@ -212,6 +125,13 @@ const TaskManager: React.FC = () => {
                 index={index}
                 onToggleComplete={toggleComplete}
                 tags={tags}
+                onDeleteTask={deleteTask}
+                onEditTaskClick={() =>
+                  state.setShowEditTaskModal({
+                    status: true,
+                    task,
+                  })
+                }
               />
             ))}
           </div>
@@ -230,22 +150,47 @@ const TaskManager: React.FC = () => {
       </div>
 
       <NewTaskModal
-        isOpen={showNewTaskModal}
-        onClose={() => setShowNewTaskModal(false)}
-        newTask={newTask}
-        onTaskChange={setNewTask}
+        isOpen={state.showNewTaskModal}
+        onClose={() => state.setShowNewTaskModal(false)}
+        newTask={state.newTask}
+        onTaskChange={state.setNewTask}
         tags={tags}
-        onToggleTag={toggleTag}
-        onSubmit={handleCreateTask}
+        onToggleTag={handlers.toggleTag}
+        onSubmit={handlers.handleCreateTask}
+      />
+
+      <EditTaskModal
+        isOpen={state.showEditTaskModal.status}
+        onClose={() => state.setShowEditTaskModal({status:false, task: null})}
+        onTaskChange={(updatedTask) => state.setShowEditTaskModal(prev => ({...prev, task: updatedTask}))}
+        tags={tags}
+        onToggleTag={handlers.toggleEditTag}
+        onSubmit={handlers.handleEditTask}
+        values={state.showEditTaskModal}
       />
 
       <CreateTagModal
-        isOpen={showCreateTagModal}
-        onClose={() => setShowCreateTagModal(false)}
-        newTag={newTag}
-        onTagChange={setNewTag}
-        onSubmit={handleCreateTag}
+        isOpen={state.showCreateTagModal}
+        onClose={() => state.setShowCreateTagModal(false)}
+        newTag={state.newTag}
+        onTagChange={state.setNewTag}
+        onSubmit={handlers.handleCreateTag}
       />
+
+      {state.editingTag && (
+        <EditTagModal
+          isOpen={state.showEditTagModal}
+          onClose={() => {
+            state.setShowEditTagModal(false);
+            state.setEditingTag(null);
+          }}
+          tag={state.editingTag}
+          onTagChange={state.setEditingTag}
+          allTags={tags}
+          onDeleteTag={handlers.handleDeleteTag}
+          onEditTag={handlers.handleEditTag}
+        />
+      )}
 
 
       <style jsx>{`
