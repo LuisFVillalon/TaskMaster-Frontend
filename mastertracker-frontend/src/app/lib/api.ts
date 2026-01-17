@@ -14,7 +14,7 @@ Functions include:
 These functions handle all HTTP interactions with the backend API.
 */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_TASKMASTER_DB_URL!;
+const API_BASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
 export async function fetchTasks() {
   const url = `${API_BASE_URL}/get-tasks`;
