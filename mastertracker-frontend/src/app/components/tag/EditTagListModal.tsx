@@ -1,5 +1,6 @@
 /*
-Purpose: This modal component allows users to manage existing tags by editing their names and colors, or deleting them with confirmation dialogs.
+Purpose: This modal component allows users to manage existing tags by editing their names and colors, 
+or deleting them with confirmation dialogs.
 
 Variables Summary:
 - isOpen: Boolean for modal visibility.

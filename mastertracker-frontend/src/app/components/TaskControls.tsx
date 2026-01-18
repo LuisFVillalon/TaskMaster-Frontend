@@ -1,5 +1,6 @@
 /*
-Purpose: This component provides the control panel for task management, including search input, filter buttons, tag selection dropdown, and buttons for creating new tasks and tags.
+Purpose: This component provides the control panel for task management, including search input, 
+filter buttons, tag selection dropdown, and buttons for creating new tasks and tags.
 
 Variables Summary:
 - searchTerm: String for the current search query.

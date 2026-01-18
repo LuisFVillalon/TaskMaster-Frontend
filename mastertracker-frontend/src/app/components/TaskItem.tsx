@@ -1,5 +1,6 @@
 /*
-Purpose: This component renders an individual task item in the task list, displaying task details, tags, due dates, and providing buttons for editing, deleting, and toggling completion.
+Purpose: This component renders an individual task item in the task list, displaying task details, 
+tags, due dates, and providing buttons for editing, deleting, and toggling completion.
 
 Variables Summary:
 - task: Task object containing title, description, completion status, due date, tags, etc.

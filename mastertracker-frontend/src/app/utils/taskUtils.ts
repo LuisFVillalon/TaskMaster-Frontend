@@ -1,5 +1,6 @@
 /*
-Purpose: This file contains utility functions for formatting and processing task-related data, including date/time formatting, color determination, and statistics calculation.
+Purpose: This file contains utility functions for formatting and processing task-related data, 
+including date/time formatting, color determination, and statistics calculation.
 
 Variables Summary:
 - formatDueTime: Function to format time strings or Date objects into readable time format.

@@ -1,5 +1,6 @@
 /*
-Purpose: This modal component provides a form for creating new tags, allowing users to enter a tag name and select a color from predefined options.
+Purpose: This modal component provides a form for creating new tags, allowing users to enter a tag name and select 
+a color from predefined options.
 
 Variables Summary:
 - isOpen: Boolean indicating if the modal is visible.

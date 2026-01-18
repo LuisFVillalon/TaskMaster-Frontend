@@ -1,5 +1,6 @@
 /*
-Purpose: This modal component provides a comprehensive form for editing existing tasks, allowing users to modify title, description, due dates, tags, and urgency status.
+Purpose: This modal component provides a comprehensive form for editing existing tasks, allowing users to 
+modify title, description, due dates, tags, and urgency status.
 
 Variables Summary:
 - isOpen: Boolean indicating if the modal is open.

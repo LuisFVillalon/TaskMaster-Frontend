@@ -1,5 +1,6 @@
 /*
-Purpose: This custom hook filters and sorts tasks based on status, search term, and selected tags, and computes statistics for different task categories.
+Purpose: This custom hook filters and sorts tasks based on status, search term, and selected tags,
+and computes statistics for different task categories.
 
 Variables Summary:
 - tasks: Array of all task objects to be filtered and analyzed.

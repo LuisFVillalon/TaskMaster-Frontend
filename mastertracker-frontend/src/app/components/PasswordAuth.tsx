@@ -1,5 +1,6 @@
 /*
-Purpose: This component handles password-based authentication for the application, validating the entered password against an environment variable and managing the login flow.
+Purpose: This component handles password-based authentication for the application, 
+validating the entered password against an environment variable and managing the login flow.
 
 Variables Summary:
 - password: String state holding the user's entered password.
