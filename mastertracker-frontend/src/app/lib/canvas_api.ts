@@ -9,7 +9,7 @@ import { CourseAssignment, CourseModule, CourseQuiz, CourseModuleItem, CourseAss
 const API_BASE_URL = process.env.NEXT_PUBLIC_TASKMASTER_DB_URL!;
 
 export async function fetchUserCourses() {
-  const res = await fetch(`${API_BASE_URL}/canvas/user-courses`);
+  const res = await fetch(`${API_BASE_URL}/user-courses`);
   if (!res.ok) {
     throw new Error(`Failed to fetch user courses`);
   }
