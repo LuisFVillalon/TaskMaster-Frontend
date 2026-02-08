@@ -56,7 +56,7 @@ export const useCanvasData = () => {
   const getCourseAssignments = async (id: number) => {
     try {
         const data = await fetchUserAssignments(id);
-        return data;
+        return sortByUpcomingDueDate(data);
     } catch (err) {
         console.error('Failed to get course Assignments:', err);
         alert("Failed to get course Assignments");
@@ -67,7 +67,7 @@ export const useCanvasData = () => {
   const getCourseQuizzes = async (id: number) => {
     try {
         const data = await fetchUserQuizzes(id);
-        return data;
+        return sortByUpcomingDueDate(data);
     } catch (err) {
         console.error('Failed to get course Quizzes:', err);
         alert("Failed to get course Quizzes");
@@ -89,7 +89,7 @@ export const useCanvasData = () => {
   const getCourseAssignmentItems = async (course_id: number, assignment_id: number): Promise<CourseAssignmentItem[]> => {
     try {
         const data = await fetchUserAssignmentItems(course_id, assignment_id);
-        return sortByUpcomingDueDate(data);
+        return data;
     } catch (err) {
         console.error('Failed to get course module item:', err);
         alert("Failed to get course module item");

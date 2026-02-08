@@ -1,15 +1,31 @@
-import { CourseAssignmentItem } from "../types/canvas";
+type HasDueAt = {
+  due_at?: string | null;
+};
 
-export const sortByUpcomingDueDate = (
-  items: CourseAssignmentItem[]
-): CourseAssignmentItem[] => {
-  const now = new Date().getTime();
+export const sortByUpcomingDueDate = <T extends HasDueAt>(
+  items: T[]
+): T[] => {
+  const now = Date.now();
 
   return [...items].sort((a, b) => {
-    const aTime = a.due_at ? new Date(a.due_at).getTime() : Infinity;
-    const bTime = b.due_at ? new Date(b.due_at).getTime() : Infinity;
+    const aTime = a.due_at ? new Date(a.due_at).getTime() : null;
+    const bTime = b.due_at ? new Date(b.due_at).getTime() : null;
 
-    // Compare how far each date is from "now"
-    return (aTime - now) - (bTime - now);
+    // No due date goes to the end
+    if (aTime === null) return 1;
+    if (bTime === null) return -1;
+
+    const aIsFuture = aTime >= now;
+    const bIsFuture = bTime >= now;
+
+    // Future items come first
+    if (aIsFuture && !bIsFuture) return -1;
+    if (!aIsFuture && bIsFuture) return 1;
+
+    // Both future: soonest first
+    if (aIsFuture && bIsFuture) return aTime - bTime;
+
+    // Both past: most recent first
+    return bTime - aTime;
   });
 };
