@@ -83,7 +83,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
                         taskToEdit: task,
                     })
                     }
-                className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition"
+                className="cursor-pointer p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition"
                 title="Edit task"
                 >
                 <Pencil className="w-4 h-4" />
@@ -92,7 +92,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
                 {/* Delete button */}
                 <button
                 onClick={() => handleDeleteTask(task)}
-                className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition"
+                className="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition cursor-pointer"
                 title="Delete task"
                 >
                 <Trash2 className="w-4 h-4" />

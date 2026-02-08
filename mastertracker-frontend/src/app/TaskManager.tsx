@@ -170,27 +170,29 @@ const TaskManager: React.FC = () => {
           />
 
           {/* Task List and Canvas Container */}
-          <div className='grid grid-cols-2 gap-4'>
+          <div className='grid  grid-cols-2 gap-4'>
             
             {/* Task List - Mobile Optimized */}
-            <div className="space-y-3">
+            <div className="space-y-3 h-full">
               <div className='font-bold text-2xl text-black'>To Do:</div>
-              {filteredTasks.map((task, index) => (
-              <TaskItem
-                  key={task.id}
-                  task={task}
-                  index={index}
-                  onToggleComplete={toggleComplete}
-                  tags={tags}
-                  onDeleteTask={deleteTask}
-                  onEditTaskClick={() =>
-                    state.setShowEditTaskModal({
-                      status: true,
-                      task,
-                    })
-                  }
-                />
-              ))}
+              <div className="flex flex-col gap-2 overflow-y-auto  pl-2 scrollbar-left">
+                {filteredTasks.map((task, index) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    index={index}
+                    onToggleComplete={toggleComplete}
+                    tags={tags}
+                    onDeleteTask={deleteTask}
+                    onEditTaskClick={() =>
+                      state.setShowEditTaskModal({
+                        status: true,
+                        task,
+                      })
+                    }
+                  />
+                ))}
+              </div>
             </div>
 
             <CanvasWrapper
@@ -303,6 +305,37 @@ const TaskManager: React.FC = () => {
         .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+
+        .scrollbar-left {
+          direction: rtl;
+        }
+
+        .scrollbar-left > :global(*) {
+          direction: ltr;
+        }
+
+        .scrollbar-left::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .scrollbar-left::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .scrollbar-left::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.4);
+          border-radius: 10px;
+          transition: background 0.2s ease;
+        }
+
+        .scrollbar-left::-webkit-scrollbar-thumb:hover {
+          background: rgba(100, 116, 139, 0.6);
+        }
+
+        .scrollbar-left {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
         }
 
         .animate-fadeIn {

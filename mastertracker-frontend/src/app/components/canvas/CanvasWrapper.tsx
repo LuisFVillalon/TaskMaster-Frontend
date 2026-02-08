@@ -219,178 +219,133 @@ const CanvasWrapper: React.FC<CanvasWrapperProps>  = ({
                         }
                     </button>
                 </div>
-                {
-                    currentCourseDisplay.map((obj, index) => (
-                        <div 
-                            key={index}
-                            className='flex flex-col gap-2 p-4 mt-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200'
-                        >
-                            {('name' in obj && activeView === 'modules') && (
-                                <>
-                                    <span
-                                        onClick={() => displayItems(obj)}
-                                        className="font-semibold text-gray-900 text-lg cursor-pointer  transition-colors duration-200 inline-flex items-center gap-2 select-none"
-                                    >
-                                        {obj.name}
-                                        <svg
-                                            className={`w-4 h-4 transition-transform duration-300 ease-in-out ${
-                                                expandedItemId === obj.id
-                                                    ? 'rotate-180'
-                                                    : 'rotate-0'
-                                            }`}
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
+                <div className="flex flex-col overflow-y-auto pl-2 scrollbar-left">
+                    {
+                        currentCourseDisplay.map((obj, index) => (
+                            <div 
+                                key={index}
+                                className='flex flex-col gap-2 p-4 mt-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200'
+                            >
+                                {('name' in obj && activeView === 'modules') && (
+                                    <>
+                                        <span
+                                            onClick={() => displayItems(obj)}
+                                            className="font-semibold text-gray-900 text-lg cursor-pointer  transition-colors duration-200 inline-flex items-center gap-2 select-none"
                                         >
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </span>
-                                    <div
-                                        className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                                            expandedItemId === obj.id
-                                                ? 'max-h-[1000px] opacity-100 mt-2'
-                                                : 'max-h-0 opacity-0'
-                                        }`}
-                                    >
-                                        <div className="space-y-2 pl-4 border-l-2 border-blue-200">
-                                            {moduleItemsIsLoading ? (
-                                                <div className="flex items-center gap-2 text-gray-600">
-                                                    <svg
-                                                        className="w-4 h-4 animate-spin"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                    >
-                                                        <circle
-                                                            className="opacity-25"
-                                                            cx="12"
-                                                            cy="12"
-                                                            r="10"
-                                                            stroke="currentColor"
-                                                            strokeWidth="4"
-                                                        />
-                                                        <path
-                                                            className="opacity-75"
-                                                            fill="currentColor"
-                                                            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                                                        />
-                                                    </svg>
-                                                    <span>Loading...</span>
-                                                </div>
-                                            ) : (
-                                                currentCourseItemsDisplay.map((item, itemIndex) => (
-                                                    <div
-                                                        key={item.id ?? itemIndex}
-                                                        className="text-base break-words transform transition-all duration-200 hover:translate-x-1"
-                                                        style={{
-                                                            animation: expandedItemId === obj.id
-                                                                ? `slideIn 0.3s ease-out ${itemIndex * 0.05}s both`
-                                                                : 'none'
-                                                        }}
-                                                    >
-                                                        {'title' in item && (
-                                                            item.html_url ? (
-                                                                <Link
-                                                                    href={item.html_url}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="
-                                                                        text-gray-700
-                                                                        hover:text-blue-600
-                                                                        hover:underline
-                                                                        cursor-pointer
-                                                                        transition-all
-                                                                        duration-200
-                                                                        inline-block
-                                                                    "
-                                                                >
-                                                                    {item.title}
-                                                                </Link>
-                                                            ) : (
-                                                                <div className="text-gray-700">
-                                                                    {item.title}
-                                                                </div>
-                                                            )
-                                                        )}
+                                            {obj.name}
+                                            <svg
+                                                className={`w-4 h-4 transition-transform duration-300 ease-in-out ${
+                                                    expandedItemId === obj.id
+                                                        ? 'rotate-180'
+                                                        : 'rotate-0'
+                                                }`}
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </span>
+                                        <div
+                                            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                                                expandedItemId === obj.id
+                                                    ? 'max-h-[1000px] opacity-100 mt-2'
+                                                    : 'max-h-0 opacity-0'
+                                            }`}
+                                        >
+                                            <div className="space-y-2 pl-4 border-l-2 border-blue-200">
+                                                {moduleItemsIsLoading ? (
+                                                    <div className="flex items-center gap-2 text-gray-600">
+                                                        <svg
+                                                            className="w-4 h-4 animate-spin"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                        >
+                                                            <circle
+                                                                className="opacity-25"
+                                                                cx="12"
+                                                                cy="12"
+                                                                r="10"
+                                                                stroke="currentColor"
+                                                                strokeWidth="4"
+                                                            />
+                                                            <path
+                                                                className="opacity-75"
+                                                                fill="currentColor"
+                                                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                                                            />
+                                                        </svg>
+                                                        <span>Loading...</span>
                                                     </div>
-                                                ))
-                                            )}
+                                                ) : (
+                                                    currentCourseItemsDisplay.map((item, itemIndex) => (
+                                                        <div
+                                                            key={item.id ?? itemIndex}
+                                                            className="text-base break-words transform transition-all duration-200 hover:translate-x-1"
+                                                            style={{
+                                                                animation: expandedItemId === obj.id
+                                                                    ? `slideIn 0.3s ease-out ${itemIndex * 0.05}s both`
+                                                                    : 'none'
+                                                            }}
+                                                        >
+                                                            {'title' in item && (
+                                                                item.html_url ? (
+                                                                    <Link
+                                                                        href={item.html_url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="
+                                                                            text-gray-700
+                                                                            hover:text-blue-600
+                                                                            hover:underline
+                                                                            cursor-pointer
+                                                                            transition-all
+                                                                            duration-200
+                                                                            inline-block
+                                                                        "
+                                                                    >
+                                                                        {item.title}
+                                                                    </Link>
+                                                                ) : (
+                                                                    <div className="text-gray-700">
+                                                                        {item.title}
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                </>
-                            )}
-                            {(activeView === 'assignments') && (
-                                <>
-                                    {('name' in obj && 'html_url' in obj) && (
-                                        <>
-                                            <Link
-                                                    href={obj.html_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"                                                    
-                                                    className="
-                                                        text-gray-700
-                                                        hover:text-blue-600
-                                                        hover:underline
-                                                        cursor-pointer
-                                                        transition-all
-                                                        duration-200
-                                                        inline-block
-                                                        font-bold
-                                                        text-lg
-                                                    "
-                                                >
-                                                {obj.name}
-                                            </Link>                                        
-                                        </>
-                                    )}
-                                    {('due_at' in obj && obj.due_at) && (
-                                        <div className="text-gray-700">
-                                            Due: {new Date(obj.due_at).toLocaleDateString('en-US', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
-                                        </div>
-                                    )}
-                                    <div className='flex gap-2'>
-                                        <p>Status: </p>
-                                        {('has_submitted_submissions' in obj && obj.has_submitted_submissions) ? 
-                                                <div className="font-semibold text-green-500">Submitted</div> : <div className='font-semibold text-red-500'>Not Submitted</div>
-                                        } 
-                                    </div>
-                                   
-                                </>
-                            )}       
-                            {(activeView === 'quizzes') && (
-                                <>
-                                    {('title' in obj && 'html_url' in obj) && (
-                                        <>
-                                            <Link
-                                                    href={obj.html_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"                                                    
-                                                    className="
-                                                        text-gray-700
-                                                        hover:text-blue-600
-                                                        hover:underline
-                                                        cursor-pointer
-                                                        transition-all
-                                                        duration-200
-                                                        inline-block
-                                                        font-bold
-                                                        text-lg
-                                                    "
-                                                >
-                                                {obj.title}
-                                            </Link>                                        
-                                        </>
-                                    )}
-                                    <div className='flex gap-2'>
-                                        <p>Due: </p>
+                                    </>
+                                )}
+                                {(activeView === 'assignments') && (
+                                    <>
+                                        {('name' in obj && 'html_url' in obj) && (
+                                            <>
+                                                <Link
+                                                        href={obj.html_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"                                                    
+                                                        className="
+                                                            text-gray-700
+                                                            hover:text-blue-600
+                                                            hover:underline
+                                                            cursor-pointer
+                                                            transition-all
+                                                            duration-200
+                                                            inline-block
+                                                            font-bold
+                                                            text-lg
+                                                        "
+                                                    >
+                                                    {obj.name}
+                                                </Link>                                        
+                                            </>
+                                        )}
                                         {('due_at' in obj && obj.due_at) && (
                                             <div className="text-gray-700">
-                                                {new Date(obj.due_at).toLocaleDateString('en-US', {
+                                                Due: {new Date(obj.due_at).toLocaleDateString('en-US', {
                                                     year: 'numeric',
                                                     month: 'long',
                                                     day: 'numeric',
@@ -398,14 +353,61 @@ const CanvasWrapper: React.FC<CanvasWrapperProps>  = ({
                                                     minute: '2-digit'
                                                 })}
                                             </div>
-                                        )}                                        
-                                    </div>
-                                </>
-                            )}                                
+                                        )}
+                                        <div className='flex gap-2'>
+                                            <p>Status: </p>
+                                            {('has_submitted_submissions' in obj && obj.has_submitted_submissions) ? 
+                                                    <div className="font-semibold text-green-500">Submitted</div> : <div className='font-semibold text-red-500'>Not Submitted</div>
+                                            } 
+                                        </div>
+                                    
+                                    </>
+                                )}       
+                                {(activeView === 'quizzes') && (
+                                    <>
+                                        {('title' in obj && 'html_url' in obj) && (
+                                            <>
+                                                <Link
+                                                        href={obj.html_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"                                                    
+                                                        className="
+                                                            text-gray-700
+                                                            hover:text-blue-600
+                                                            hover:underline
+                                                            cursor-pointer
+                                                            transition-all
+                                                            duration-200
+                                                            inline-block
+                                                            font-bold
+                                                            text-lg
+                                                        "
+                                                    >
+                                                    {obj.title}
+                                                </Link>                                        
+                                            </>
+                                        )}
+                                        <div className='flex gap-2'>
+                                            <p>Due: </p>
+                                            {('due_at' in obj && obj.due_at) && (
+                                                <div className="text-gray-700">
+                                                    {new Date(obj.due_at).toLocaleDateString('en-US', {
+                                                        year: 'numeric',
+                                                        month: 'long',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </div>
+                                            )}                                        
+                                        </div>
+                                    </>
+                                )}                                
 
-                        </div>
-                    ))
-                }
+                            </div>
+                        ))
+                    }
+                </div>
             </div>
             
             <style jsx>{`
@@ -419,6 +421,19 @@ const CanvasWrapper: React.FC<CanvasWrapperProps>  = ({
                         transform: translateX(0);
                     }
                 }
+
+                .scrollbar-left::-webkit-scrollbar-thumb:hover {
+                background: rgba(100, 116, 139, 0.6);
+                }
+
+                .scrollbar-left {
+                scrollbar-width: thin;
+                scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+                }
+
+                .animate-fadeIn {
+                animation: fadeIn 0.2s ease-out;
+                }                    
             `}</style>
         </div>
     );

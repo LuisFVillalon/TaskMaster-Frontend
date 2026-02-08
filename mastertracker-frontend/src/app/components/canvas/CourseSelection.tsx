@@ -74,7 +74,7 @@ const CourseSelection: React.FC<CourseSelectionProps>  = ({
 
     return (
 
-        <div className='text-black'>
+        <div className='space-y-3 text-black'>
             <div className='font-bold text-2xl text-black'>Canvas:</div>
             {canvasCourses.length > 0 && (
                 <div className="space-y-4">
