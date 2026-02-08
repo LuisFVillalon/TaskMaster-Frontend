@@ -58,7 +58,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
         </button>
 
         <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 sm:gap-4 mb-1.5 sm:mb-2">
+          <div className="flex items-start justify-between gap-2 sm:gap-4 mb-1.5 sm:mb-2">
             <h3
                 className={`text-base sm:text-lg font-semibold leading-snug ${
                 task.completed ? 'text-gray-400 line-through' : 'text-gray-900'
@@ -98,14 +98,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
                 <Trash2 className="w-4 h-4" />
                 </button>
             </div>
-            </div>
-
-          <p className={`text-xs sm:text-sm mb-3 leading-relaxed ${
+          </div>
+          <p className={`break-words text-xs sm:text-sm mb-3 leading-relaxed ${
             task.completed ? 'text-gray-400' : 'text-gray-600'
           }`}>
             {task.description}
           </p>
-
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
             <div className={`flex items-center gap-1.5 text-xs sm:text-sm ${getDueDateColor(task.due_date, task.completed)}`}>
               <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

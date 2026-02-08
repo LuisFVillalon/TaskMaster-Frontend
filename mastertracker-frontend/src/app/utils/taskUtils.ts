@@ -128,7 +128,6 @@ export const getTaskDateTime = (task: Task): number => {
 
 export const countTasksByTag = (tasks: Task[]) => {
   const map: Record<number, { name: string; color: string; count: number }> = {};
-    console.log(tasks)
   tasks.forEach(task => {
     task.tags?.forEach(tag => {
       if (!map[tag.id]) {

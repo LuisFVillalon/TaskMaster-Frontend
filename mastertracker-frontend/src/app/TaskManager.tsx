@@ -22,6 +22,7 @@ These variables are used to render the UI components and handle user interaction
 
 import React from 'react';
 import { useTasks, useTags } from '@/app/hooks/useTasksAndTags';
+import { useCanvasData } from './hooks/useCanvasData';
 import { useTaskManagerState } from '@/app/hooks/useTaskManagerState';
 import { useTaskHandlers } from '@/app/hooks/useTaskHandlers';
 import { useTaskFiltering } from '@/app/hooks/useTaskFiltering';
@@ -34,10 +35,30 @@ import CreateTagModal from '@/app/components/tag/CreateTagModal';
 import EditTagModal from '@/app/components/tag/EditTagListModal';
 import { Filter } from 'lucide-react';
 import Image from 'next/image';
+import CanvasWrapper from '@/app/components/canvas/CanvasWrapper';
 
 
 const TaskManager: React.FC = () => {
   const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks } = useTasks();
+  const { 
+    currentCourseId,
+    canvasCourses,
+    canvasModules,
+    canvasAssignments,
+    canvasQuizzes,
+    canvasIsLoading,
+    setCurrentCourseId,
+    setCanvasCourses,
+    setCanvasModules,
+    setCanvasAssignments,
+    setCanvasQuizzes,
+    getCourseModules,
+    getCourseAssignments,
+    getCourseQuizzes,
+    getCourseModuleItems,
+    getCourseAssignmentItems,
+    getCourseQuizItems
+  } = useCanvasData();
   const { tags, tagsLoading, addTag, delTag, updateTag } = useTags();
 
   // State management
@@ -148,25 +169,52 @@ const TaskManager: React.FC = () => {
             }}
           />
 
-          {/* Task List - Mobile Optimized */}
-          <div className="space-y-3">
-            {filteredTasks.map((task, index) => (
+          {/* Task List and Canvas Container */}
+          <div className='grid grid-cols-2 gap-4'>
+            
+            {/* Task List - Mobile Optimized */}
+            <div className="space-y-3">
+              <div className='font-bold text-2xl text-black'>To Do:</div>
+              {filteredTasks.map((task, index) => (
               <TaskItem
-                key={task.id}
-                task={task}
-                index={index}
-                onToggleComplete={toggleComplete}
-                tags={tags}
-                onDeleteTask={deleteTask}
-                onEditTaskClick={() =>
-                  state.setShowEditTaskModal({
-                    status: true,
-                    task,
-                  })
-                }
-              />
-            ))}
+                  key={task.id}
+                  task={task}
+                  index={index}
+                  onToggleComplete={toggleComplete}
+                  tags={tags}
+                  onDeleteTask={deleteTask}
+                  onEditTaskClick={() =>
+                    state.setShowEditTaskModal({
+                      status: true,
+                      task,
+                    })
+                  }
+                />
+              ))}
+            </div>
+
+            <CanvasWrapper
+            currentCourseId={currentCourseId}
+              canvasCourses={canvasCourses}
+              canvasModules={canvasModules}
+              canvasAssignments={canvasAssignments}
+              canvasQuizzes={canvasQuizzes}
+              canvasIsLoading={canvasIsLoading}
+              setCurrentCourseId={setCurrentCourseId}
+              setCanvasCourses={setCanvasCourses}
+              setCanvasModules={setCanvasModules}
+              setCanvasAssignments={setCanvasAssignments}
+              setCanvasQuizzes={setCanvasQuizzes}              
+              getCourseModules={getCourseModules}
+              getCourseAssignments={getCourseAssignments}
+              getCourseQuizzes={getCourseQuizzes}
+              getCourseModuleItems={getCourseModuleItems}
+              getCourseAssignmentItems={getCourseAssignmentItems}
+              getCourseQuizItems={getCourseQuizItems}
+            />
           </div>
+
+
 
           {/* Empty State */}
           {filteredTasks.length === 0 && (
