@@ -15,6 +15,7 @@ import { fetchUserCourses,
     fetchUserQuizItems,
 } from "@/app/lib/canvas_api";
 import { UserCourse, CourseModule, CourseAssignment, CourseQuiz, CourseModuleItem, CourseAssignmentItem, CourseQuizItem } from '@/app/types/canvas';
+import { sortByUpcomingDueDate } from '../utils/canvasUtils';
 
 export const useCanvasData = () => {
   const [currentCourseId, setCurrentCourseId] = useState(0);
@@ -88,7 +89,7 @@ export const useCanvasData = () => {
   const getCourseAssignmentItems = async (course_id: number, assignment_id: number): Promise<CourseAssignmentItem[]> => {
     try {
         const data = await fetchUserAssignmentItems(course_id, assignment_id);
-        return data;
+        return sortByUpcomingDueDate(data);
     } catch (err) {
         console.error('Failed to get course module item:', err);
         alert("Failed to get course module item");
