@@ -109,7 +109,7 @@ const CanvasWrapper: React.FC<CanvasWrapperProps>  = ({
                 setItemsIsLoading={setItemsIsLoading}
             />
             <div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-3 mb-2">
                     <button 
                         onClick={() => handleViewChange('modules')}
                         disabled={itemsIsLoading}
@@ -219,7 +219,7 @@ const CanvasWrapper: React.FC<CanvasWrapperProps>  = ({
                         }
                     </button>
                 </div>
-                <div className="flex flex-col overflow-y-auto pl-2 scrollbar-left">
+                <div className="flex flex-col overflow-y-auto h-[50vh] sm:h-[60vh] lg:h-[400px] pl-2 scrollbar-left">
                     {
                         currentCourseDisplay.map((obj, index) => (
                             <div 
