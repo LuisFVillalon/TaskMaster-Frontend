@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
-// Define semester types
 type SemesterType = 'Spring' | 'Summer' | 'Fall' | 'Winter';
 
 interface SemesterInfo {
@@ -13,8 +12,6 @@ interface SemesterInfo {
   weekCount: number;
 }
 
-// SDSU Academic Calendar Data (2024-2025)
-// Update these dates according to the official SDSU academic calendar
 const academicCalendar: SemesterInfo[] = [
   {
     type: 'Spring',
@@ -36,87 +33,93 @@ interface CalendarResult {
 
 const SDSUAcademicCalendar: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [calendarInfo, setCalendarInfo] = useState<CalendarResult>({
-    currentSemester: null,
-    weekNumber: null,
-    daysIntoSemester: null,
-    daysRemaining: null,
-    isInSession: false,
-    nextSemester: null,
-  });
 
   const calculateCalendarInfo = (date: Date): CalendarResult => {
-    // Find current semester
-    const currentSemester = academicCalendar.find(
-      (semester) => date >= semester.startDate && date <= semester.endDate
-    );
+    const currentSemester =
+      academicCalendar.find(
+        (semester) =>
+          date >= semester.startDate && date <= semester.endDate
+      ) ?? null;
 
     let weekNumber: number | null = null;
     let daysIntoSemester: number | null = null;
     let daysRemaining: number | null = null;
 
     if (currentSemester) {
-      // Calculate days into semester
-      const timeDiff = date.getTime() - currentSemester.startDate.getTime();
-      daysIntoSemester = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+      const timeDiff =
+        date.getTime() - currentSemester.startDate.getTime();
 
-      // Calculate week number (1-indexed)
+      daysIntoSemester = Math.floor(
+        timeDiff / (1000 * 60 * 60 * 24)
+      );
+
       weekNumber = Math.floor(daysIntoSemester / 7) + 1;
 
-      // Ensure week number doesn't exceed the semester's week count
       if (weekNumber > currentSemester.weekCount) {
         weekNumber = currentSemester.weekCount;
       }
 
-      // Calculate days remaining
-      const timeRemaining = currentSemester.endDate.getTime() - date.getTime();
-      daysRemaining = Math.ceil(timeRemaining / (1000 * 60 * 60 * 24));
+      const timeRemaining =
+        currentSemester.endDate.getTime() - date.getTime();
+
+      daysRemaining = Math.ceil(
+        timeRemaining / (1000 * 60 * 60 * 24)
+      );
     }
 
-    // Find next semester
-    const nextSemester = academicCalendar.find(
-      (semester) => semester.startDate > date
-    ) || null;
+    const nextSemester =
+      academicCalendar.find(
+        (semester) => semester.startDate > date
+      ) ?? null;
 
     return {
       currentSemester,
       weekNumber,
       daysIntoSemester,
       daysRemaining,
-      isInSession: currentSemester !== undefined,
+      isInSession: currentSemester !== null,
       nextSemester,
     };
   };
 
-  useEffect(() => {
-    const info = calculateCalendarInfo(currentDate);
-    setCalendarInfo(info);
+  // ✅ Derived state (no useEffect needed)
+  const calendarInfo = useMemo(() => {
+    return calculateCalendarInfo(currentDate);
+  }, [currentDate]);
 
-    // Update every day at midnight
+  // ✅ Midnight updater effect (runs once)
+  useEffect(() => {
+    const updateDate = () => setCurrentDate(new Date());
+
     const now = new Date();
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+    const tomorrow = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1
+    );
+
+    const timeUntilMidnight =
+      tomorrow.getTime() - now.getTime();
 
     const timeout = setTimeout(() => {
-      setCurrentDate(new Date());
-      // Set up daily interval
-      const interval = setInterval(() => {
-        setCurrentDate(new Date());
-      }, 24 * 60 * 60 * 1000);
+      updateDate();
+      const interval = setInterval(
+        updateDate,
+        24 * 60 * 60 * 1000
+      );
 
       return () => clearInterval(interval);
     }, timeUntilMidnight);
 
     return () => clearTimeout(timeout);
-  }, [currentDate]);
+  }, []);
 
-  const formatDate = (date: Date): string => {
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (date: Date): string =>
+    date.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
     });
-  };
 
   const getSemesterColor = (type: SemesterType): string => {
     switch (type) {
@@ -132,12 +135,14 @@ const SDSUAcademicCalendar: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto h-full  p-6 bg-white rounded-2xl shadow-lg">
+    <div className="w-full max-w-4xl mx-auto h-full p-6 bg-white rounded-2xl shadow-lg">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-red-600 mb-2">
           SDSU Academic Calendar
         </h1>
-        <p className="text-gray-600">San Diego State University</p>
+        <p className="text-gray-600">
+          San Diego State University
+        </p>
       </div>
 
       {/* Current Date Display */}
@@ -149,7 +154,8 @@ const SDSUAcademicCalendar: React.FC = () => {
       </div>
 
       {/* Current Semester Info */}
-      {calendarInfo.isInSession && calendarInfo.currentSemester ? (
+      {calendarInfo.isInSession &&
+      calendarInfo.currentSemester ? (
         <div className="mb-6">
           <div
             className={`p-6 rounded-lg border-2 ${getSemesterColor(
@@ -163,29 +169,43 @@ const SDSUAcademicCalendar: React.FC = () => {
                   {calendarInfo.currentSemester.year}
                 </h2>
                 <p className="text-sm mt-1">
-                  {formatDate(calendarInfo.currentSemester.startDate)} -{' '}
-                  {formatDate(calendarInfo.currentSemester.endDate)}
+                  {formatDate(
+                    calendarInfo.currentSemester.startDate
+                  )}{' '}
+                  -{' '}
+                  {formatDate(
+                    calendarInfo.currentSemester.endDate
+                  )}
                 </p>
               </div>
+
               <div className="text-right">
                 <div className="text-4xl font-bold">
                   Week {calendarInfo.weekNumber}
                 </div>
                 <div className="text-sm">
-                  of {calendarInfo.currentSemester.weekCount}
+                  of{' '}
+                  {
+                    calendarInfo.currentSemester.weekCount
+                  }
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div className="bg-white bg-opacity-50 p-3 rounded">
-                <p className="text-sm font-medium">Days into Semester</p>
+                <p className="text-sm font-medium">
+                  Days into Semester
+                </p>
                 <p className="text-2xl font-bold">
                   {calendarInfo.daysIntoSemester}
                 </p>
               </div>
+
               <div className="bg-white bg-opacity-50 p-3 rounded">
-                <p className="text-sm font-medium">Days Remaining</p>
+                <p className="text-sm font-medium">
+                  Days Remaining
+                </p>
                 <p className="text-2xl font-bold">
                   {calendarInfo.daysRemaining}
                 </p>
@@ -205,8 +225,9 @@ const SDSUAcademicCalendar: React.FC = () => {
                       100
                     }%`,
                   }}
-                ></div>
+                />
               </div>
+
               <p className="text-xs text-center mt-1">
                 {Math.round(
                   ((calendarInfo.daysIntoSemester || 0) /
@@ -234,3 +255,7 @@ const SDSUAcademicCalendar: React.FC = () => {
 };
 
 export default SDSUAcademicCalendar;
+
+
+
+

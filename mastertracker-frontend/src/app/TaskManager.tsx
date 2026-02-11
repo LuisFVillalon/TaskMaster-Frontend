@@ -209,7 +209,7 @@ const TaskManager: React.FC = () => {
             {/* Task List - Mobile Optimized */}
             <div className="space-y-2 sm:space-y-3 h-full order-1 lg:order-1">
               <div className='font-bold text-xl sm:text-2xl text-black px-2'>To Do:</div>
-              <div className="flex flex-col gap-2 overflow-y-auto max-h-[50vh] sm:max-h-[60vh] lg:max-h-[calc(100vh-28rem)] pl-2 pr-1 scrollbar-custom">
+              <div className="flex flex-col gap-2 overflow-y-auto max-h-[50vh] sm:max-h-[60vh] lg:max-h-[25%] pl-2 pr-1 scrollbar-custom">
                 {filteredTasks.map((task, index) => (
                   <TaskItem
                     key={task.id}
