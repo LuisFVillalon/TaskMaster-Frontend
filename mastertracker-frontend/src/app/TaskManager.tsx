@@ -3,6 +3,14 @@ Purpose: This file contains the main TaskManager component, which serves as the 
 for the task management application. It integrates various hooks and components to display tasks, 
 handle user interactions, and manage application state.
 
+MOBILE-FRIENDLY UPDATES:
+- Responsive grid layouts that stack on mobile
+- Touch-friendly button sizes
+- Optimized spacing for small screens
+- Collapsible sections for mobile
+- Better overflow handling
+- Improved typography scaling
+
 Variables Summary:
 - tasks: Array of task objects fetched from the backend, used to display the task list.
 - isLoading: Boolean indicating if tasks are being loaded, used for loading spinner.
@@ -20,7 +28,7 @@ These variables are used to render the UI components and handle user interaction
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTasks, useTags } from '@/app/hooks/useTasksAndTags';
 import { useCanvasData } from './hooks/useCanvasData';
 import { useTaskManagerState } from '@/app/hooks/useTaskManagerState';
@@ -33,10 +41,10 @@ import NewTaskModal from '@/app/components/task/NewTaskModal';
 import EditTaskModal from '@/app/components/task/EditTaskModal';
 import CreateTagModal from '@/app/components/tag/CreateTagModal';
 import EditTagModal from '@/app/components/tag/EditTagListModal';
-import { Filter } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import Image from 'next/image';
 import CanvasWrapper from '@/app/components/canvas/CanvasWrapper';
-
+import SDSUAcademicCalendar from '@/app/components/SDSUAcademicCalendar';
 
 const TaskManager: React.FC = () => {
   const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks } = useTasks();
@@ -60,6 +68,10 @@ const TaskManager: React.FC = () => {
     getCourseQuizItems
   } = useCanvasData();
   const { tags, tagsLoading, addTag, delTag, updateTag } = useTags();
+
+  // Mobile-specific state
+  const [showStats, setShowStats] = useState(true);
+  const [showCanvas, setShowCanvas] = useState(false);
 
   // State management
   const state = useTaskManagerState();
@@ -98,6 +110,7 @@ const TaskManager: React.FC = () => {
     state.searchTerm,
     state.selectedTags
   );
+
   if (isLoading || tagsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
@@ -112,22 +125,22 @@ const TaskManager: React.FC = () => {
   return (
     <>
       <div className="min-h-screen bg-[#EFE7DD]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
-          {/* Header */}
-          <div className="mb-6 sm:mb-8 flex justify-between items-center">
-            <div className="flex justify-center items-center">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-10">
+          {/* Header - Mobile Optimized */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex items-center">
                 <Image
                   src="/icon.svg"
                   alt="Favicon"
-                  width={100}
-                  height={100}
-                  className="mr-2"
+                  width={60}
+                  height={60}
+                  className="sm:w-[80px] sm:h-[80px] lg:w-[100px] lg:h-[100px]"
                 />
               </div>
               <div>
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900">Task Master</h1>
-                <p className="text-sm sm:text-base text-gray-600">Manage your work, stay productive</p>
+                <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold text-gray-900">Task Master</h1>
+                <p className="text-xs sm:text-sm lg:text-base text-gray-600">Manage your work, stay productive</p>
               </div>
             </div>
             <button
@@ -135,47 +148,68 @@ const TaskManager: React.FC = () => {
                 localStorage.removeItem('taskmaster_authenticated');
                 window.location.reload();
               }}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+              className="px-3 py-2 sm:px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs sm:text-sm font-medium w-full sm:w-auto"
             >
               Logout
             </button>
           </div>
 
-          {/* Stats Cards - Mobile First Grid */}
-          <div className="grid grid-cols-2 gap-4 my-4">
-            <StatsCard title="Total" stats={stats.total} />
-            <StatsCard title="Active" stats={stats.active} color="#3B82F6" />
-            <StatsCard title="Done" stats={stats.completed} color="#85BB65" />
-            <StatsCard title="Urgent" stats={stats.urgent} color="#FF0000" />
+          {/* Academic Calendar & Stats Cards - Mobile Responsive */}
+          <div className='grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6'>
+            {/* Academic Calendar - Hidden on mobile, shown on larger screens */}
+            <div className="hidden lg:block">
+              <SDSUAcademicCalendar/>
+            </div>
+            
+            {/* Stats Cards - Collapsible on mobile */}
+            <div className="w-full lg:w-auto">
+              <button 
+                onClick={() => setShowStats(!showStats)}
+                className="lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
+              >
+                <span className="font-semibold text-gray-900">Statistics</span>
+                {showStats ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </button>
+              
+              <div className={`grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-1 gap-2 sm:gap-3 lg:gap-4 ${!showStats ? 'hidden lg:grid' : ''}`}>
+                <StatsCard title="Total" stats={stats.total} />
+                <StatsCard title="Active" stats={stats.active} color="#3B82F6" />
+                <StatsCard title="Done" stats={stats.completed} color="#85BB65" />
+                <StatsCard title="Urgent" stats={stats.urgent} color="#FF0000" />
+              </div>
+            </div>
           </div>
 
-          <TaskControls
-            searchTerm={state.searchTerm}
-            onSearchChange={state.setSearchTerm}
-            filter={state.filter}
-            sortOrder={state.sortOrder}
-            onFilterChange={handlers.handleFilterChange}
-            selectedTags={state.selectedTags}
-            onTagToggle={handlers.toggleSelectedTag}
-            showTagDropdown={state.showTagDropdown}
-            onTagDropdownToggle={() => state.setShowTagDropdown(prev => !prev)}
-            tags={tags}
-            onNewTaskClick={() => state.setShowNewTaskModal(true)}
-            onCreateTagClick={() => state.setShowCreateTagModal(true)}
-            onEditTagClick={() => {
-              if (tags.length > 0) {
-                handlers.openEditTagModal(tags[0]); // For now, edit the first tag
-              }
-            }}
-          />
+          {/* Task Controls */}
+          <div className="mb-4 sm:mb-6">
+            <TaskControls
+              searchTerm={state.searchTerm}
+              onSearchChange={state.setSearchTerm}
+              filter={state.filter}
+              sortOrder={state.sortOrder}
+              onFilterChange={handlers.handleFilterChange}
+              selectedTags={state.selectedTags}
+              onTagToggle={handlers.toggleSelectedTag}
+              showTagDropdown={state.showTagDropdown}
+              onTagDropdownToggle={() => state.setShowTagDropdown(prev => !prev)}
+              tags={tags}
+              onNewTaskClick={() => state.setShowNewTaskModal(true)}
+              onCreateTagClick={() => state.setShowCreateTagModal(true)}
+              onEditTagClick={() => {
+                if (tags.length > 0) {
+                  handlers.openEditTagModal(tags[0]);
+                }
+              }}
+            />
+          </div>
 
-          {/* Task List and Canvas Container */}
-          <div className='grid  grid-cols-2 gap-4'>
+          {/* Task List and Canvas Container - Mobile Responsive */}
+          <div className='grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4'>
             
             {/* Task List - Mobile Optimized */}
-            <div className="space-y-3 h-full">
-              <div className='font-bold text-2xl text-black'>To Do:</div>
-              <div className="flex flex-col gap-2 overflow-y-auto  pl-2 scrollbar-left">
+            <div className="space-y-2 sm:space-y-3 h-full order-1 lg:order-1">
+              <div className='font-bold text-xl sm:text-2xl text-black px-2'>To Do:</div>
+              <div className="flex flex-col gap-2 overflow-y-auto max-h-[50vh] sm:max-h-[60vh] lg:max-h-[calc(100vh-28rem)] pl-2 pr-1 scrollbar-custom">
                 {filteredTasks.map((task, index) => (
                   <TaskItem
                     key={task.id}
@@ -195,34 +229,45 @@ const TaskManager: React.FC = () => {
               </div>
             </div>
 
-            <CanvasWrapper
-            currentCourseId={currentCourseId}
-              canvasCourses={canvasCourses}
-              canvasModules={canvasModules}
-              canvasAssignments={canvasAssignments}
-              canvasQuizzes={canvasQuizzes}
-              canvasIsLoading={canvasIsLoading}
-              setCurrentCourseId={setCurrentCourseId}
-              setCanvasCourses={setCanvasCourses}
-              setCanvasModules={setCanvasModules}
-              setCanvasAssignments={setCanvasAssignments}
-              setCanvasQuizzes={setCanvasQuizzes}              
-              getCourseModules={getCourseModules}
-              getCourseAssignments={getCourseAssignments}
-              getCourseQuizzes={getCourseQuizzes}
-              getCourseModuleItems={getCourseModuleItems}
-              getCourseAssignmentItems={getCourseAssignmentItems}
-              getCourseQuizItems={getCourseQuizItems}
-            />
+            {/* Canvas Wrapper - Collapsible on mobile */}
+            <div className="order-2 lg:order-2">
+              <button 
+                onClick={() => setShowCanvas(!showCanvas)}
+                className="lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
+              >
+                <span className="font-semibold text-gray-900">Canvas Integration</span>
+                {showCanvas ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </button>
+              
+              <div className={`${!showCanvas ? 'hidden lg:block' : 'block'}`}>
+                <CanvasWrapper
+                  currentCourseId={currentCourseId}
+                  canvasCourses={canvasCourses}
+                  canvasModules={canvasModules}
+                  canvasAssignments={canvasAssignments}
+                  canvasQuizzes={canvasQuizzes}
+                  canvasIsLoading={canvasIsLoading}
+                  setCurrentCourseId={setCurrentCourseId}
+                  setCanvasCourses={setCanvasCourses}
+                  setCanvasModules={setCanvasModules}
+                  setCanvasAssignments={setCanvasAssignments}
+                  setCanvasQuizzes={setCanvasQuizzes}              
+                  getCourseModules={getCourseModules}
+                  getCourseAssignments={getCourseAssignments}
+                  getCourseQuizzes={getCourseQuizzes}
+                  getCourseModuleItems={getCourseModuleItems}
+                  getCourseAssignmentItems={getCourseAssignmentItems}
+                  getCourseQuizItems={getCourseQuizItems}
+                />
+              </div>
+            </div>
           </div>
-
-
 
           {/* Empty State */}
           {filteredTasks.length === 0 && (
-            <div className="bg-white rounded-xl sm:rounded-2xl p-8 sm:p-12 text-center shadow-sm border border-gray-100">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <Filter className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
+            <div className="bg-white rounded-lg sm:rounded-xl lg:rounded-2xl p-6 sm:p-8 lg:p-12 text-center shadow-sm border border-gray-100 mt-4">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <Filter className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-gray-400" />
               </div>
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No tasks found</h3>
               <p className="text-sm sm:text-base text-gray-600">Try adjusting your filters or search term</p>
@@ -231,6 +276,7 @@ const TaskManager: React.FC = () => {
         </div>
       </div>
 
+      {/* Modals */}
       <NewTaskModal
         isOpen={state.showNewTaskModal}
         onClose={() => state.setShowNewTaskModal(false)}
@@ -274,7 +320,6 @@ const TaskManager: React.FC = () => {
         />
       )}
 
-
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -307,39 +352,50 @@ const TaskManager: React.FC = () => {
           scrollbar-width: none;
         }
 
-        .scrollbar-left {
+        /* Custom scrollbar for better mobile experience */
+        .scrollbar-custom {
           direction: rtl;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
         }
 
-        .scrollbar-left > :global(*) {
+        .scrollbar-custom > :global(*) {
           direction: ltr;
         }
 
-        .scrollbar-left::-webkit-scrollbar {
-          width: 6px;
+        .scrollbar-custom::-webkit-scrollbar {
+          width: 4px;
         }
 
-        .scrollbar-left::-webkit-scrollbar-track {
+        @media (min-width: 640px) {
+          .scrollbar-custom::-webkit-scrollbar {
+            width: 6px;
+          }
+        }
+
+        .scrollbar-custom::-webkit-scrollbar-track {
           background: transparent;
         }
 
-        .scrollbar-left::-webkit-scrollbar-thumb {
+        .scrollbar-custom::-webkit-scrollbar-thumb {
           background: rgba(148, 163, 184, 0.4);
           border-radius: 10px;
           transition: background 0.2s ease;
         }
 
-        .scrollbar-left::-webkit-scrollbar-thumb:hover {
+        .scrollbar-custom::-webkit-scrollbar-thumb:hover {
           background: rgba(100, 116, 139, 0.6);
-        }
-
-        .scrollbar-left {
-          scrollbar-width: thin;
-          scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
         }
 
         .animate-fadeIn {
           animation: fadeIn 0.2s ease-out;
+        }
+
+        /* Touch-friendly tap targets */
+        @media (max-width: 640px) {
+          button {
+            min-height: 44px;
+          }
         }
       `}</style>
     </>

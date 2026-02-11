@@ -96,7 +96,7 @@ const CourseSelection: React.FC<CourseSelectionProps>  = ({
                         <div className="flex-1 overflow-hidden">
                             <div 
                                 key={currentIndex}
-                                className={`grid grid-cols-3 gap-2 animate-in fade-in ${
+                                className={`grid grid-cols-1 md:grid-cols-3 gap-2 animate-in fade-in ${
                                     direction === 'right' ? 'slide-in-from-right-10' : 'slide-in-from-left-10'
                                 } duration-300`}
                             >

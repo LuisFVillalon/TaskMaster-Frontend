@@ -1,0 +1,236 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+
+// Define semester types
+type SemesterType = 'Spring' | 'Summer' | 'Fall' | 'Winter';
+
+interface SemesterInfo {
+  type: SemesterType;
+  year: number;
+  startDate: Date;
+  endDate: Date;
+  weekCount: number;
+}
+
+// SDSU Academic Calendar Data (2024-2025)
+// Update these dates according to the official SDSU academic calendar
+const academicCalendar: SemesterInfo[] = [
+  {
+    type: 'Spring',
+    year: 2026,
+    startDate: new Date('2026-01-20'),
+    endDate: new Date('2026-05-13'),
+    weekCount: 16,
+  },
+];
+
+interface CalendarResult {
+  currentSemester: SemesterInfo | null;
+  weekNumber: number | null;
+  daysIntoSemester: number | null;
+  daysRemaining: number | null;
+  isInSession: boolean;
+  nextSemester: SemesterInfo | null;
+}
+
+const SDSUAcademicCalendar: React.FC = () => {
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [calendarInfo, setCalendarInfo] = useState<CalendarResult>({
+    currentSemester: null,
+    weekNumber: null,
+    daysIntoSemester: null,
+    daysRemaining: null,
+    isInSession: false,
+    nextSemester: null,
+  });
+
+  const calculateCalendarInfo = (date: Date): CalendarResult => {
+    // Find current semester
+    const currentSemester = academicCalendar.find(
+      (semester) => date >= semester.startDate && date <= semester.endDate
+    );
+
+    let weekNumber: number | null = null;
+    let daysIntoSemester: number | null = null;
+    let daysRemaining: number | null = null;
+
+    if (currentSemester) {
+      // Calculate days into semester
+      const timeDiff = date.getTime() - currentSemester.startDate.getTime();
+      daysIntoSemester = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+
+      // Calculate week number (1-indexed)
+      weekNumber = Math.floor(daysIntoSemester / 7) + 1;
+
+      // Ensure week number doesn't exceed the semester's week count
+      if (weekNumber > currentSemester.weekCount) {
+        weekNumber = currentSemester.weekCount;
+      }
+
+      // Calculate days remaining
+      const timeRemaining = currentSemester.endDate.getTime() - date.getTime();
+      daysRemaining = Math.ceil(timeRemaining / (1000 * 60 * 60 * 24));
+    }
+
+    // Find next semester
+    const nextSemester = academicCalendar.find(
+      (semester) => semester.startDate > date
+    ) || null;
+
+    return {
+      currentSemester,
+      weekNumber,
+      daysIntoSemester,
+      daysRemaining,
+      isInSession: currentSemester !== undefined,
+      nextSemester,
+    };
+  };
+
+  useEffect(() => {
+    const info = calculateCalendarInfo(currentDate);
+    setCalendarInfo(info);
+
+    // Update every day at midnight
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+
+    const timeout = setTimeout(() => {
+      setCurrentDate(new Date());
+      // Set up daily interval
+      const interval = setInterval(() => {
+        setCurrentDate(new Date());
+      }, 24 * 60 * 60 * 1000);
+
+      return () => clearInterval(interval);
+    }, timeUntilMidnight);
+
+    return () => clearTimeout(timeout);
+  }, [currentDate]);
+
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const getSemesterColor = (type: SemesterType): string => {
+    switch (type) {
+      case 'Spring':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'Summer':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'Fall':
+        return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'Winter':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+    }
+  };
+
+  return (
+    <div className="w-full max-w-4xl mx-auto h-full  p-6 bg-white rounded-2xl shadow-lg">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-red-600 mb-2">
+          SDSU Academic Calendar
+        </h1>
+        <p className="text-gray-600">San Diego State University</p>
+      </div>
+
+      {/* Current Date Display */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <p className="text-sm text-gray-600">Current Date</p>
+        <p className="text-xl font-semibold text-gray-800">
+          {formatDate(currentDate)}
+        </p>
+      </div>
+
+      {/* Current Semester Info */}
+      {calendarInfo.isInSession && calendarInfo.currentSemester ? (
+        <div className="mb-6">
+          <div
+            className={`p-6 rounded-lg border-2 ${getSemesterColor(
+              calendarInfo.currentSemester.type
+            )}`}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {calendarInfo.currentSemester.type}{' '}
+                  {calendarInfo.currentSemester.year}
+                </h2>
+                <p className="text-sm mt-1">
+                  {formatDate(calendarInfo.currentSemester.startDate)} -{' '}
+                  {formatDate(calendarInfo.currentSemester.endDate)}
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-4xl font-bold">
+                  Week {calendarInfo.weekNumber}
+                </div>
+                <div className="text-sm">
+                  of {calendarInfo.currentSemester.weekCount}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="bg-white bg-opacity-50 p-3 rounded">
+                <p className="text-sm font-medium">Days into Semester</p>
+                <p className="text-2xl font-bold">
+                  {calendarInfo.daysIntoSemester}
+                </p>
+              </div>
+              <div className="bg-white bg-opacity-50 p-3 rounded">
+                <p className="text-sm font-medium">Days Remaining</p>
+                <p className="text-2xl font-bold">
+                  {calendarInfo.daysRemaining}
+                </p>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mt-4">
+              <div className="w-full bg-white bg-opacity-50 rounded-full h-3">
+                <div
+                  className="bg-current h-3 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${
+                      ((calendarInfo.daysIntoSemester || 0) /
+                        ((calendarInfo.daysIntoSemester || 0) +
+                          (calendarInfo.daysRemaining || 0))) *
+                      100
+                    }%`,
+                  }}
+                ></div>
+              </div>
+              <p className="text-xs text-center mt-1">
+                {Math.round(
+                  ((calendarInfo.daysIntoSemester || 0) /
+                    ((calendarInfo.daysIntoSemester || 0) +
+                      (calendarInfo.daysRemaining || 0))) *
+                    100
+                )}
+                % Complete
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-6 p-6 bg-gray-100 rounded-lg border-2 border-gray-300">
+          <h2 className="text-xl font-bold text-gray-700 mb-2">
+            Not Currently in Session
+          </h2>
+          <p className="text-gray-600">
+            You are currently between semesters.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SDSUAcademicCalendar;
