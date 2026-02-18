@@ -7,8 +7,11 @@ Variables Summary:
 - Tag: Interface for tag objects with id, name, color.
 - Task: Interface for task objects with all properties.
 - FilterType: Union type for filter options.
-- NewTaskForm, EditTaskForm: Interfaces for task creation and editing forms.
-- NewTagForm: Interface for tag creation form.
+- BaseTaskForm: Base interface for task forms.
+- NewTaskForm: Interface for task creation form, extends BaseTaskForm.
+- EditTaskForm: Interface for task editing form, extends BaseTaskForm with completed.
+- NewTagForm: Interface for tag creation form, omits id from Tag.
+- TagStats: Interface for tag statistics with count.
 - TaskStats: Interface for task statistics with tasks and tags arrays.
 - StatsData: Interface for overall statistics data.
 
@@ -40,7 +43,7 @@ export interface Task {
 
 export type FilterType = 'all' | 'active' | 'completed' | 'urgent';
 
-export interface NewTaskForm {
+export interface BaseTaskForm {
   title: string;
   description: string;
   urgent: boolean;
@@ -49,28 +52,23 @@ export interface NewTaskForm {
   tags: Tag[];
 }
 
-export interface EditTaskForm {
-  title: string;
-  description: string;
-  urgent: boolean;
-  due_date: string;
-  due_time: string;
+export interface NewTaskForm extends BaseTaskForm {}
+
+export interface EditTaskForm extends BaseTaskForm {
   completed: boolean;
-  tags: Tag[];
 }
 
-export interface NewTagForm {
+export interface NewTagForm extends Omit<Tag, 'id'> {}
+
+export interface TagStats {
   name: string;
   color: string;
+  count: number;
 }
 
 export interface TaskStats {
   tasks: Task[];
-  tags: Array<{
-    name: string;
-    color: string;
-    count: number;
-  }>;
+  tags: TagStats[];
 }
 
 export interface StatsData {

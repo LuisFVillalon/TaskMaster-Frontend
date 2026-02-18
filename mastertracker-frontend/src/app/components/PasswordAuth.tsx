@@ -12,16 +12,18 @@ These variables are used to manage the form state, validate input, and provide u
 */
 
 import React, { useState } from 'react';
-import { Lock } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+import Image from 'next/image';
 
 interface PasswordAuthProps {
-  onAuthenticated: () => void;
+  onAuthenticated: (isDemo: boolean) => void;
 }
 
 const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +32,7 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
 
     // Check password against environment variable
     const correctPassword = process.env.NEXT_PUBLIC_APP_PASSWORD;
+    const demoPassword = process.env.NEXT_PUBLIC_APP_DEMO_PASSWORD;
 
     if (!correctPassword) {
       setError('Password not configured. Please contact administrator.');
@@ -40,14 +43,22 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
     // Simple delay for UX
     await new Promise(resolve => setTimeout(resolve, 500));
 
+    let isDemo = false;
     if (password === correctPassword) {
-      // Store authentication in localStorage
-      localStorage.setItem('taskmaster_authenticated', 'true');
-      onAuthenticated();
+      isDemo = false;
+    } else if (password === demoPassword) {
+      isDemo = true;
     } else {
       setError('Incorrect password. Please try again.');
       setPassword('');
+      setIsLoading(false);
+      return;
     }
+
+    // Store authentication in localStorage
+    localStorage.setItem('taskmaster_authenticated', 'true');
+    localStorage.setItem('taskmaster_demo', isDemo ? 'true' : 'false');
+    onAuthenticated(isDemo);
 
     setIsLoading(false);
   };
@@ -57,11 +68,16 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-blue-200">
           <div className="text-center mb-8">
-            <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <Lock className="w-8 h-8 text-blue-600" />
+            <div className="flex items-center justify-center">
+              <Image
+                src="/icon.svg"
+                alt="Favicon"
+                width={240}
+                height={120}
+              />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">TaskMaster</h1>
-            <p className="text-gray-600">Enter your password to continue</p>
+            <p className="text-gray-600">Type “recruiter” to try the demo</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -69,16 +85,29 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900"
-                placeholder="Enter password"
-                required
-                autoFocus
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900"
+                  placeholder="Enter password"
+                  required
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -104,7 +133,7 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
           </form>
 
           <div className="mt-6 text-center text-xs text-gray-500">
-            Task Management Application
+            Luis Villalón © 2026
           </div>
         </div>
       </div>

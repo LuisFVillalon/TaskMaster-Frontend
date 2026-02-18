@@ -4,51 +4,45 @@ handling user authentication and conditionally rendering the TaskManager or Pass
 
 Variables Summary:
 - isAuthenticated: Boolean state indicating if the user has been authenticated, checked from localStorage.
+- isDemo: Boolean state indicating if the user is in demo mode.
 - isLoading: Boolean state for the initial loading phase while checking authentication.
-- handleAuthenticated: Function that sets isAuthenticated to true when login succeeds.
+- handleAuthenticated: Function that sets isAuthenticated and isDemo when login succeeds.
 
 These variables manage the authentication flow, showing a loading spinner initially, the auth form if not authenticated, or the main TaskManager if authenticated.
 */
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import TaskManager from "./TaskManager";
 import PasswordAuth from "./components/PasswordAuth";
 
 // Home page, asks user for a password to access the web application. 
 // isLoading is the loading status
-// isAunthenticated dictates if the user can access the web app
+// isAuthenticated dictates if the user can access the web app
+// isDemo indicates demo mode
+
 export default function Page() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('taskmaster_authenticated') === 'true';
+  });
 
-  useEffect(() => {
-    // Check if user is already authenticated
-    const authenticated = localStorage.getItem('taskmaster_authenticated') === 'true';
-  // eslint-disable-next-line react-hooks/set-state-in-effect    
-    setIsAuthenticated(authenticated);
-    setIsLoading(false);
-  }, []);
+  const [isDemo, setIsDemo] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('taskmaster_demo') === 'true';
+  });
 
-  const handleAuthenticated = () => {
+  const handleAuthenticated = (demo: boolean) => {
+    localStorage.setItem('taskmaster_authenticated', 'true');
+    localStorage.setItem('taskmaster_demo', demo.toString());
     setIsAuthenticated(true);
+    setIsDemo(demo);
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (!isAuthenticated) {
     return <PasswordAuth onAuthenticated={handleAuthenticated} />;
   }
 
-  return <TaskManager />;
+  return <TaskManager isDemo={isDemo} />;
 }

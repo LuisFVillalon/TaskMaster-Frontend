@@ -46,8 +46,8 @@ import Image from 'next/image';
 import CanvasWrapper from '@/app/components/canvas/CanvasWrapper';
 import SDSUAcademicCalendar from '@/app/components/SDSUAcademicCalendar';
 
-const TaskManager: React.FC = () => {
-  const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks } = useTasks();
+const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
+  const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks } = useTasks(isDemo);
   const { 
     currentCourseId,
     canvasCourses,
@@ -67,11 +67,12 @@ const TaskManager: React.FC = () => {
     getCourseAssignmentItems,
     getCourseQuizItems
   } = useCanvasData();
-  const { tags, tagsLoading, addTag, delTag, updateTag } = useTags();
+  const { tags, tagsLoading, addTag, delTag, updateTag } = useTags(isDemo);
 
   // Mobile-specific state
-  const [showStats, setShowStats] = useState(true);
-  const [showCanvas, setShowCanvas] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showCal, setShowCal] = useState(false);
+  const [showCanvas, setShowCanvas] = useState(true);
 
   // State management
   const state = useTaskManagerState();
@@ -127,17 +128,19 @@ const TaskManager: React.FC = () => {
       <div className="min-h-screen bg-[#EFE7DD]">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-10">
           {/* Header - Mobile Optimized */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center">
-                <Image
-                  src="/icon.svg"
-                  alt="Favicon"
-                  width={60}
-                  height={60}
-                  className="sm:w-[80px] sm:h-[80px] lg:w-[100px] lg:h-[100px]"
-                />
-              </div>
+<div className="flex items-center">
+  <div className="relative w-14 h-14 sm:w-16 sm:h-16 lg:w-32 lg:h-32 xl:w-40 xl:h-40">
+    <Image
+      src="/icon.svg"
+      alt="Favicon"
+      fill
+      className="object-contain"
+      priority
+    />
+  </div>
+</div>
               <div>
                 <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold text-gray-900">Task Master</h1>
                 <p className="text-xs sm:text-sm lg:text-base text-gray-600">Manage your work, stay productive</p>
@@ -157,7 +160,14 @@ const TaskManager: React.FC = () => {
           {/* Academic Calendar & Stats Cards - Mobile Responsive */}
           <div className='grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6'>
             {/* Academic Calendar - Hidden on mobile, shown on larger screens */}
-            <div className="hidden lg:block">
+            <button 
+                onClick={() => setShowCal(!showCal)}
+                className="text-black lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
+              >
+                <span className="font-semibold text-gray-900">Academic Calendar</span>
+                {showCal ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </button>
+            <div className={`${!showCal ? 'hidden lg:grid' : ''}`}>
               <SDSUAcademicCalendar/>
             </div>
             
@@ -165,7 +175,7 @@ const TaskManager: React.FC = () => {
             <div className="w-full lg:w-auto">
               <button 
                 onClick={() => setShowStats(!showStats)}
-                className="lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
+                className="text-black lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
               >
                 <span className="font-semibold text-gray-900">Statistics</span>
                 {showStats ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -209,31 +219,40 @@ const TaskManager: React.FC = () => {
             {/* Task List - Mobile Optimized with Fixed Height */}
             <div className="space-y-2 sm:space-y-3 order-1 lg:order-1">
               <div className='font-bold text-xl sm:text-2xl text-black px-2'>To Do:</div>
-              <div className="flex flex-col gap-2 overflow-y-auto h-[50vh] sm:h-[60vh] lg:h-[600px] pl-2 pr-1 scrollbar-custom">
-                {filteredTasks.map((task, index) => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    index={index}
-                    onToggleComplete={toggleComplete}
-                    tags={tags}
-                    onDeleteTask={deleteTask}
-                    onEditTaskClick={() =>
-                      state.setShowEditTaskModal({
-                        status: true,
-                        task,
-                      })
-                    }
-                  />
-                ))}
-              </div>
+              {filteredTasks.length === 0 ? (
+                <div className="bg-white rounded-lg sm:rounded-xl lg:rounded-2xl p-6 sm:p-8 lg:p-12 text-center shadow-sm border border-gray-100 mt-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                    <Filter className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No tasks found</h3>
+                  <p className="text-sm sm:text-base text-gray-600">Try adjusting your filters or search term</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 overflow-y-auto h-[50vh] sm:h-[60vh] lg:h-[600px] pl-2 pr-1 scrollbar-custom">
+                  {filteredTasks.map((task, index) => (
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      index={index}
+                      onToggleComplete={toggleComplete}
+                      tags={tags}
+                      onDeleteTask={deleteTask}
+                      onEditTaskClick={() =>
+                        state.setShowEditTaskModal({
+                          status: true,
+                          task,
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-
             {/* Canvas Wrapper - Collapsible on mobile */}
             <div className="order-2 lg:order-2">
               <button 
                 onClick={() => setShowCanvas(!showCanvas)}
-                className="lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
+                className="text-black lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
               >
                 <span className="font-semibold text-gray-900">Canvas Integration</span>
                 {showCanvas ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -262,17 +281,6 @@ const TaskManager: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Empty State */}
-          {filteredTasks.length === 0 && (
-            <div className="bg-white rounded-lg sm:rounded-xl lg:rounded-2xl p-6 sm:p-8 lg:p-12 text-center shadow-sm border border-gray-100 mt-4">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <Filter className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-gray-400" />
-              </div>
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No tasks found</h3>
-              <p className="text-sm sm:text-base text-gray-600">Try adjusting your filters or search term</p>
-            </div>
-          )}
         </div>
       </div>
 

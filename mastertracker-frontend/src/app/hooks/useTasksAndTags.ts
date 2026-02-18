@@ -22,11 +22,49 @@ import { fetchTasks,
 } from "@/app/lib/api";
 import { Task, Tag, NewTaskForm, NewTagForm, EditTaskForm } from '@/app/types/task';
 
-export const useTasks = () => {
+export const useTasks = (demo: boolean = false) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (demo) {
+      // Load sample data for demo
+      const sampleTasks: Task[] = [
+        {
+          id: 3,
+          title: "Prepare for midterm exam",
+          description: "Study algorithms and data structures for the upcoming midterm",
+          completed: false,
+          urgent: true,
+          due_date: "2026-03-01",
+          due_time: "10:00",
+          tags: [{ id: 2, name: "Study", color: "#10B981" }]
+        },
+        {
+          id: 4,
+          title: "Update resume",
+          description: "Add recent projects and skills to the resume",
+          completed: false,
+          urgent: false,
+          due_date: null,
+          due_time: null,
+          tags: [{ id: 1, name: "Work", color: "#3B82F6" }]
+        },
+        {
+          id: 5,
+          title: "Chillax",
+          description: "Relax for a while, enjoy yourself",
+          completed: true,
+          urgent: false,
+          due_date: "2026-02-14",
+          due_time: "11:59 PM",
+          tags: [{ id: 3, name: "Personal", color: "#F59E0B"  }]
+        },
+      ];
+      setTasks(sampleTasks);
+      setIsLoading(false);
+      return;
+    }
     const loadTasks = async () => {
       try {
         setIsLoading(true);
@@ -41,7 +79,7 @@ export const useTasks = () => {
     };
 
     loadTasks();
-  }, []);
+  }, [demo]);
 
   const toggleComplete = (id: number): void => {
     setTasks(tasks.map(task =>
@@ -51,6 +89,20 @@ export const useTasks = () => {
   };
 
   const addTask = async (newTask: NewTaskForm) => {
+    if (demo) {
+      const createdTask: Task = {
+        id: Math.max(0, ...tasks.map(t => t.id)) + 1,
+        title: newTask.title,
+        description: newTask.description,
+        completed: false,
+        urgent: newTask.urgent,
+        due_date: newTask.due_date,
+        due_time: newTask.due_time,
+        tags: newTask.tags || []
+      };
+      setTasks([createdTask, ...tasks]);
+      return true;
+    }
     try {
         const createdTask = await createTask(newTask);
         setTasks([createdTask, ...tasks]);
@@ -63,7 +115,10 @@ export const useTasks = () => {
   };
 
   const deleteTask = async (delTask: Task) => {
-    
+    if (demo) {
+      setTasks(prev => prev.filter(task => task.id !== delTask.id));
+      return true;
+    }
     try {
         await onDelete(delTask.id);
         setTasks(prev =>
@@ -78,7 +133,7 @@ export const useTasks = () => {
   };
 
   const updateCompleteStatus = async (id_task: number) => {
-    
+    if (demo) return true;
     try {
         await updateCompleteTask(id_task);
         return true;
@@ -90,6 +145,10 @@ export const useTasks = () => {
   };
 
   const updateTask = async (id: number, updatedTask: EditTaskForm) => {
+    if (demo) {
+      setTasks(prev => prev.map(task => task.id === id ? { ...task, ...updatedTask } : task));
+      return true;
+    }
     try {
         const updated = await updateWholeTask(id, updatedTask) as Task;
         console.log(updatedTask)
@@ -113,11 +172,22 @@ export const useTasks = () => {
   };
 };
 
-export const useTags = () => {
+export const useTags = (demo: boolean = false) => {
   const [tags, setTags] = useState<Tag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(true);
 
   useEffect(() => {
+    if (demo) {
+      // Load sample tags for demo
+      const sampleTags: Tag[] = [
+        { id: 1, name: "Work", color: "#3B82F6" },
+        { id: 2, name: "Study", color: "#10B981" },
+        { id: 3, name: "Personal", color: "#F59E0B" },
+      ];
+      setTags(sampleTags);
+      setTagsLoading(false);
+      return;
+    }
     const loadTags = async () => {
       try {
         setTagsLoading(true);
@@ -132,10 +202,20 @@ export const useTags = () => {
     };
 
     loadTags();
-  }, []);
+  }, [demo]);
 
   const addTag = async (newTag: NewTagForm) => {
     if (!newTag.name.trim()) return false;
+
+    if (demo) {
+      const tag: Tag = {
+        id: Math.max(0, ...tags.map(t => t.id)) + 1,
+        name: newTag.name,
+        color: newTag.color
+      };
+      setTags(prev => [...prev, tag]);
+      return tag;
+    }
 
     try {
       await createTag(newTag);
@@ -155,7 +235,10 @@ export const useTags = () => {
   };
 
   const delTag = async (delTag: Tag) => {
-    
+    if (demo) {
+      setTags(prev => prev.filter(tag => tag.id !== delTag.id));
+      return delTag.id;
+    }
     try {
         console.log(delTag)
         await onDeleteTag(delTag.id);
@@ -171,7 +254,10 @@ export const useTags = () => {
   };
 
   const updateTag = async (tagToUpdate: Tag) => {
-    
+    if (demo) {
+      setTags(prev => prev.map(tag => tag.id === tagToUpdate.id ? tagToUpdate : tag));
+      return tagToUpdate.id;
+    }
     try {
         await updateTagApi(tagToUpdate.id, { name: tagToUpdate.name, color: tagToUpdate.color });
         setTags(prev =>
