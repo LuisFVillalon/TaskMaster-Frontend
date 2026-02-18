@@ -128,19 +128,19 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
       <div className="min-h-screen bg-[#EFE7DD]">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-10">
           {/* Header - Mobile Optimized */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:mb-4 sm:gap-0">
             <div className="flex items-center gap-2 sm:gap-3">
-<div className="flex items-center">
-  <div className="relative w-14 h-14 sm:w-16 sm:h-16 lg:w-32 lg:h-32 xl:w-40 xl:h-40">
-    <Image
-      src="/icon.svg"
-      alt="Favicon"
-      fill
-      className="object-contain"
-      priority
-    />
-  </div>
-</div>
+                <div className="flex items-center">
+                  <div className="relative w-14 h-14 sm:w-16 sm:h-16 lg:w-32 lg:h-32 xl:w-40 xl:h-40">
+                    <Image
+                      src="/icon.svg"
+                      alt="Favicon"
+                      fill
+                      className="object-contain"
+                      priority
+                    />
+                  </div>
+                </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold text-gray-900">Task Master</h1>
                 <p className="text-xs sm:text-sm lg:text-base text-gray-600">Manage your work, stay productive</p>
