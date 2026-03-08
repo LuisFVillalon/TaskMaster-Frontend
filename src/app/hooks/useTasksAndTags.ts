@@ -20,7 +20,7 @@ import { fetchTasks,
     // updateCompleteTask, 
     updateWholeTask 
 } from "@/app/lib/api";
-import { Task, Tag, NewTaskForm, EditTaskForm } from '@/app/types/task';
+import { Task, Tag, NewTaskForm, EditTaskForm, NewTag } from '@/app/types/task';
 // Helper function to format date in local timezone (not UTC)
 const getLocalISOString = (date: Date): string => {
   const year = date.getFullYear();
@@ -280,7 +280,7 @@ export const useTags = (demo: boolean = false) => {
     loadTags();
   }, [demo]);
 
-  const addTag = async (newTag: Tag) => {
+  const addTag = async (newTag: NewTag) => {
     if (!newTag.name.trim()) return false;
 
     if (demo) {

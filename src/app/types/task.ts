@@ -54,7 +54,6 @@ export interface Task {
   user_id: number;
 }
 
-
 export interface BaseTaskForm {
   title: string;
   description: string;
@@ -80,7 +79,8 @@ export interface EditTaskForm extends BaseTaskForm {
   completed_date: string | Date | null;
 }
 
-// export interface NewTagForm extends Omit<Tag, 'id'> {}
+// export interface NewTag extends Omit<Tag, 'id'> {}
+export type NewTag = Omit<Tag, "id">;
 
 export interface TagStats {
   name: string;
