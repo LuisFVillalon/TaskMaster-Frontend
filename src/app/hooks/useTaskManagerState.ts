@@ -58,7 +58,7 @@ export const useTaskManagerState = () => {
     tags: [],
     category: null,
     created_time: '',
-    estimated_time: null,
+    estimated_time: 0,
     complexity: null
   });
 

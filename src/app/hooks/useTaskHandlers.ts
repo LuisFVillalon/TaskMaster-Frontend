@@ -21,7 +21,7 @@ interface UseTaskHandlersProps {
   setNewTask: React.Dispatch<React.SetStateAction<NewTaskForm>>;
   setShowEditTaskModal: React.Dispatch<React.SetStateAction<EditTaskModalState>>;
   setShowCreateTagModal: (show: boolean) => void;
-  setNewTag: React.Dispatch<React.SetStateAction<{ name: string; color: string }>>;
+  setNewTag: React.Dispatch<React.SetStateAction<Tag>>;
   setEditingTag: (tag: Tag | null) => void;
   setShowEditTagModal: (show: boolean) => void;
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
@@ -32,7 +32,7 @@ interface UseTaskHandlersProps {
   // Current state values
   newTask: NewTaskForm;
   showEditTaskModal: EditTaskModalState;
-  newTag: { name: string; color: string };
+  newTag: {id: number, name: string; color: string };
   filter: FilterType;
   sortOrder: Record<FilterType, 'asc' | 'desc'>;
   selectedTags: Tag[];
@@ -40,7 +40,7 @@ interface UseTaskHandlersProps {
   // API functions
   addTask: (task: NewTaskForm) => Promise<boolean>;
   updateTask: (id: number, task: EditTaskForm) => Promise<boolean>;
-  addTag: (tag: { name: string; color: string }) => Promise<Tag | false>;
+  addTag: (tag: {id: number, name: string; color: string }) => Promise<Tag | false>;
   updateTag: (tag: Tag) => Promise<number | null>;
   delTag: (tag: Tag) => Promise<number | null>;
 }
@@ -140,7 +140,7 @@ export const useTaskHandlers = ({
         tags: [...prev.tags, tag]
       }));
 
-      setNewTag({ name: '', color: '#3B82F6' });
+      setNewTag({id: 0, name: '', color: '#3B82F6' });
       setShowCreateTagModal(false);
     }
   };
