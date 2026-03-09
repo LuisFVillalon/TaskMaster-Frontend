@@ -22,19 +22,19 @@ import { getDueColor, getDurationColor, getComplexityColor, formatTime12Hour, fo
 interface TaskItemProps {
   task: Task;
   index: number;
-  onToggleComplete: (id: number) => void;
+  onToggleComplete?: (id: number) => void;
   tags: Array<{ id: number; name: string; color: string }>;
-  onDeleteTask: (task: Task) => void;
-  onEditTaskClick: (params: { status: boolean; task: Task }) => void;
+  onDeleteTask?: (task: Task) => void;
+  onEditTaskClick?: (params: { status: boolean; task: Task }) => void;
 }
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags, onDeleteTask, onEditTaskClick }) => {
     const handleDeleteTask = async (taskToDelete: Task) => {
-        onDeleteTask(taskToDelete);
+        onDeleteTask?.(taskToDelete);
     };
     const handleEditTask = async (  { status, taskToEdit }: { status: boolean; taskToEdit: Task }
     ) => {
-        onEditTaskClick({
+        onEditTaskClick?.({
             status,
             task: taskToEdit,
         });
@@ -62,7 +62,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
       >
       <div className="flex items-start gap-3 sm:gap-4">
         <button
-          onClick={() => onToggleComplete(task.id)}
+          onClick={() => onToggleComplete?.(task.id)}
           className={`mt-0.5 sm:mt-1 flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 flex items-center justify-center transition-all active:scale-90 ${
             task.completed
               ? 'bg-green-500 border-green-500'

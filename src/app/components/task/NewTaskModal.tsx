@@ -1,20 +1,5 @@
-/*
-Purpose: This modal component provides a form for creating new tasks, allowing users to enter title, description, due dates, select tags, and mark as urgent.
-
-Variables Summary:
-- isOpen: Boolean indicating if the modal is open.
-- onClose: Function to close the modal.
-- newTask: NewTaskForm object containing the form data for the new task.
-- onTaskChange: Function to update the newTask object with user input.
-- tags: Array of available tags for selection.
-- onToggleTag: Function to toggle a tag's selection for the new task.
-- onSubmit: Function to handle form submission and create the task.
-
-These variables manage the form state for creating new tasks.
-*/
-
-import React, { Dispatch, SetStateAction } from 'react';
-import { X, Calendar, Clock, AlertCircle } from 'lucide-react';
+import React, { Dispatch, SetStateAction, useState } from 'react';
+import { X, Calendar, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { NewTaskForm, Tag, TaskCategory, Task } from '@/app/types/task';
 
 interface NewTaskModalProps {
@@ -28,6 +13,7 @@ interface NewTaskModalProps {
   handleNewAITask: (task: Task) => Promise<void>;
   newAITask: Task | undefined;
   setNewAITask: Dispatch<SetStateAction<Task | undefined>>;
+  setAiPlan: Dispatch<SetStateAction<Task[] | undefined>>;
 }
 
 const NewTaskModal: React.FC<NewTaskModalProps> = ({
@@ -42,10 +28,11 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
   newAITask,
   setNewAITask
 }) => {
+  const [isLoading, setIsLoading] = useState(false);
+
   if (!isOpen) return null;
   const isAIMode = !!newTask.category;
 
-  // Syncs both newTask (form state) and newAITask simultaneously on every change
   const handleTaskChange = (updatedTask: NewTaskForm) => {
     onTaskChange(updatedTask);
     setNewAITask((prev) => ({
@@ -62,7 +49,6 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
     } as Task));
   };
 
-  // Syncs tag toggles to both newTask and newAITask
   const handleToggleTag = (tag: Tag) => {
     onToggleTag(tag);
     setNewAITask((prev) => {
@@ -73,6 +59,18 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
         : [...(prev.tags ?? []), tag];
       return { ...prev, tags: updatedTags };
     });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    setIsLoading(true);
+    await onSubmit(e);
+    setIsLoading(false);
+  };
+
+  const handleAISubmit = async () => {
+    setIsLoading(true);
+    await handleNewAITask(newAITask!);
+    setIsLoading(false);
   };
 
   return (
@@ -91,7 +89,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           
           {/* Urgent Checkbox */}
           <div className="flex items-center gap-3">
@@ -159,9 +157,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                   category: value === '' ? null : value as TaskCategory
                 });
               }}
-              className={`text-black w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white 
-              focus:outline-none focus:ring-2 focus:ring-blue-500 
-             `}
+              className="text-black w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">(none)</option>
               <option value="homework">Homework Assignment</option>
@@ -174,7 +170,6 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
 
           {/* Estimated Hours & Complexity */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Estimated Hours */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Estimated Hours{isAIMode && <span className="text-red-500">*</span>}
@@ -194,28 +189,19 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                 placeholder="e.g. 2.5"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-black"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Increments of 0.5 hours
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Increments of 0.5 hours</p>
             </div>
 
-            {/* Complexity */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Complexity{isAIMode && <span className="text-red-500">*</span>}
               </label>
-
               <div className="relative">
-                {/* Background Track */}
                 <div className="h-2 bg-gray-200 rounded-full" />
-
-                {/* Filled Track */}
                 <div
                   className="absolute top-0 left-0 h-2 bg-blue-600 rounded-full transition-all"
                   style={{ width: `${(((newTask.complexity ?? 1) - 1) / 4) * 100}%` }}
                 />
-
-                {/* Range Input */}
                 <input
                   type="range"
                   min={1}
@@ -231,8 +217,6 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                   }
                   className="absolute top-0 left-0 w-full h-2 appearance-none bg-transparent cursor-pointer"
                 />
-
-                {/* Thumb Styling */}
                 <style jsx>{`
                   input[type='range']::-webkit-slider-thumb {
                     appearance: none;
@@ -244,11 +228,9 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                     cursor: pointer;
                     transition: 0.2s ease;
                   }
-
                   input[type='range']::-webkit-slider-thumb:hover {
                     transform: scale(1.1);
                   }
-
                   input[type='range']::-moz-range-thumb {
                     height: 18px;
                     width: 18px;
@@ -259,14 +241,10 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                   }
                 `}</style>
               </div>
-
-              {/* Labels */}
               <div className="flex justify-between text-xs text-gray-500 mt-2">
                 <span>Very Easy</span>
                 <span>Very Hard</span>
               </div>
-
-              {/* Selected Value Badge */}
               <div className="mt-3 flex justify-center">
                 <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-semibold rounded-full">
                   Level {newTask.complexity}
@@ -311,21 +289,18 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
 
           {/* Tags */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tags
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4 border border-gray-300 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
               {tags.map((tag) => {
                 const selected = newTask.tags.some(t => t.id === tag.id);
-
                 return (
                   <button
                     key={tag.id}
                     type="button"
                     onClick={() => handleToggleTag(tag)}
                     style={{
-                      backgroundColor: selected ? tag.color :'#F5F1EB',
-                      color: selected ? '#ffffff':'#000000',
+                      backgroundColor: selected ? tag.color : '#F5F1EB',
+                      color: selected ? '#ffffff' : '#000000',
                       transform: selected ? 'scale(1)' : 'scale(0.95)',
                     }}
                     className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-100 active:scale-90"
@@ -343,10 +318,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                   return (
                     <span
                       key={tag.id}
-                      style={{
-                        backgroundColor: tagData?.color || '#3B82F6',
-                        color: 'white'
-                      }}
+                      style={{ backgroundColor: tagData?.color || '#3B82F6', color: 'white' }}
                       className="px-2 py-1 rounded-md text-xs font-medium"
                     >
                       {tag.name}
@@ -362,26 +334,43 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+              disabled={isLoading}
+              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
-            {isAIMode ? 
-                <button
-                  type="button"
-                  onClick={() => handleNewAITask(newAITask!)}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm"
-                >
+            {isAIMode ? (
+              <button
+                type="button"
+                onClick={handleAISubmit}
+                disabled={isLoading}
+                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="font-bold">Creating...</span>
+                  </>
+                ) : (
                   <span className="font-bold">Create AI Task Plan</span>
-                </button>
-              : 
+                )}
+              </button>
+            ) : (
               <button
                 type="submit"
-                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm"
+                disabled={isLoading}
+                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <span className="font-bold">Create Task</span>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="font-bold">Creating...</span>
+                  </>
+                ) : (
+                  <span className="font-bold">Create Task</span>
+                )}
               </button>
-            }
+            )}
           </div>
         </form>
       </div>

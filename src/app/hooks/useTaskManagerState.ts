@@ -32,6 +32,8 @@ export const useTaskManagerState = () => {
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [aiPlan, setAiPlan] = useState<Task[] | undefined>([]);
+  const [displayAISubTasks, setDisplayAISubTasks]= useState(false);
 
   // Modal states
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
@@ -89,6 +91,10 @@ export const useTaskManagerState = () => {
     newTask,
     newAITask,
     setNewTask,
-    setNewAITask
+    setNewAITask,
+    aiPlan,
+    setAiPlan,
+    displayAISubTasks,
+    setDisplayAISubTasks
   };
 };

@@ -18,7 +18,7 @@ import { fetchTasks,
     onDeleteTag,
     updateTag as updateTagApi,
     // updateCompleteTask, 
-    updateWholeTask 
+    updateWholeTask
 } from "@/app/lib/backend-api";
 import { 
     sendNewTaskToAIAPI
@@ -36,6 +36,7 @@ const getLocalISOString = (date: Date): string => {
   
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
 };
+
 export const useTasks = (demo: boolean = false) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -189,7 +190,6 @@ export const useTasks = (demo: boolean = false) => {
   }; 
 
   const sendTaskToAI = async (newAITask: Task) => {
-    if (demo) return true;
     try {
         const normalizedTask = {
           ...newAITask,
@@ -209,12 +209,12 @@ export const useTasks = (demo: boolean = false) => {
           estimated_time: newAITask.estimated_time ?? 0,
           complexity: newAITask.complexity ?? 1,
         };
-        await sendNewTaskToAIAPI(normalizedTask);
-        return true;
+        const aiTasks = await sendNewTaskToAIAPI(normalizedTask);
+        return aiTasks;
     } catch (err) {
         console.error(err);
         alert("Failed to send task to AI app");
-        return false;
+        return null;
     }
   };   
 

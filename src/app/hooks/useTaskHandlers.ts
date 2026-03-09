@@ -29,6 +29,8 @@ interface UseTaskHandlersProps {
   setSortOrder: React.Dispatch<React.SetStateAction<Record<FilterType, 'asc' | 'desc'>>>;
   setSelectedTags: React.Dispatch<React.SetStateAction<Tag[]>>;
   setFilter: React.Dispatch<React.SetStateAction<FilterType>>;
+  setAiPlan: React.Dispatch<React.SetStateAction<Task[] | undefined>>;
+  setDisplayAISubTasks: React.Dispatch<React.SetStateAction<boolean>>;
 
   // Current state values
   newTask: NewTaskForm;
@@ -45,7 +47,10 @@ interface UseTaskHandlersProps {
   addTag: (tag: {name: string; color: string }) => Promise<Tag | false>;
   updateTag: (tag: Tag) => Promise<number | null>;
   delTag: (tag: Tag) => Promise<number | null>;
-  sendTaskToAI: (task: Task) => Promise<boolean>;
+  sendTaskToAI: (task: Task) => Promise<{
+    new_task: Task;
+    subtasks: Task[];
+  }>;
 }
 
 export const useTaskHandlers = ({
@@ -69,7 +74,9 @@ export const useTaskHandlers = ({
   addTag,
   updateTag,
   delTag,
-  sendTaskToAI
+  sendTaskToAI,
+  setAiPlan,
+  setDisplayAISubTasks
 }: UseTaskHandlersProps) => {
 
   const toggleSelectedTag = (tag: Tag) => {
@@ -109,29 +116,41 @@ export const useTaskHandlers = ({
   };
 
   const handleNewAITask = async (aiTask: Task) => {
-    // ✅ Always require title
     if (!aiTask.title.trim()) {
       alert("Title is required.");
       return;
     }
+
     const isAIMode = !!aiTask.category;
-    // 🤖 If AI Plan Mode is enabled
+
     if (isAIMode) {
       if (!aiTask.estimated_time || aiTask.estimated_time < 0.5) {
         alert("Estimated hours (minimum 0.5) are required for AI plan.");
         return;
       }
+
       if (!aiTask.complexity || aiTask.complexity < 1) {
         alert("Complexity level is required for AI plan.");
         return;
       }
+
       if (!aiTask.due_date || !aiTask.due_time) {
         alert("Due date and time are required for AI plan.");
         return;
       }
+
       const success_task_send_to_ai = await sendTaskToAI(aiTask);
-      if (success_task_send_to_ai ) {
-        console.log("success sending task to ai")
+
+      const all_ai_tasks: Task[] = [
+        success_task_send_to_ai.new_task,
+        ...success_task_send_to_ai.subtasks
+      ];
+
+      setAiPlan(all_ai_tasks);
+      setDisplayAISubTasks(true)
+      if (success_task_send_to_ai) {
+        console.log("success sending task to ai");
+
         setShowNewTaskModal(false);
 
         setNewTask({
@@ -145,7 +164,7 @@ export const useTaskHandlers = ({
           estimated_time: null,
           complexity: null,
           created_time: '',
-        });        
+        });
       }
     }
   };
@@ -270,6 +289,7 @@ export const useTaskHandlers = ({
     }
   };
 
+
   return {
     toggleSelectedTag,
     handleCreateTask,
@@ -281,6 +301,7 @@ export const useTaskHandlers = ({
     toggleTag,
     toggleEditTag,
     handleFilterChange,
-    handleNewAITask
+    handleNewAITask,
+
   };
 };

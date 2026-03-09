@@ -1,21 +1,5 @@
-/*
-Purpose: This modal component provides a comprehensive form for editing existing tasks, allowing users to 
-modify title, description, due dates, tags, and urgency status.
-
-Variables Summary:
-- isOpen: Boolean indicating if the modal is open.
-- onClose: Function to close the modal.
-- onTaskChange: Function to update the task object with new values.
-- tags: Array of all available tags for selection.
-- onToggleTag: Function to toggle a tag's selection for the task.
-- onSubmit: Function to handle form submission and save changes.
-- values: EditTaskModalState object containing the modal status and the task being edited.
-
-These variables manage the editing state and form interactions for task modification.
-*/
-
-import React from 'react';
-import { X, Calendar, Clock, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Calendar, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import {  Tag, EditTaskModalState, Task } from '@/app/types/task';
 
 interface EditTaskModalProps {
@@ -37,8 +21,20 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
   onSubmit,
   values
 }) => {
+  const [isLoading, setIsLoading] = useState(false);
+
   if (!isOpen) return null;
   if (!values.task) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    setIsLoading(true);
+    try {
+      await onSubmit(e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-fadeIn">
       <div
@@ -54,7 +50,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
-        <form onSubmit={onSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Urgent Checkbox */}
           <div className="flex items-center gap-3">
             <input
@@ -285,15 +281,24 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+              disabled={isLoading}
+              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm"
+              disabled={isLoading}
+              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-sm disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Save Task
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="font-bold">Saving...</span>
+                </>
+              ) : (
+                <span className="font-bold">Save Task</span>
+              )}
             </button>
           </div>
         </form>
