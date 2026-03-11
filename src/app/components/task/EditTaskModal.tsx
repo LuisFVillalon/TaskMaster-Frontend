@@ -218,8 +218,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 <input
                   type="time"
                   value={
-                    values.task?.due_time instanceof Date 
-                      ? values.task.due_time.toISOString().slice(0, 16) 
+                    values.task?.due_time instanceof Date
+                      ? values.task.due_time.toISOString().slice(11, 16) // HH:mm
                       : (values.task?.due_time ?? '')
                   }
                   onChange={(e) => onTaskChange({ ...values.task!, due_time: e.target.value })}
