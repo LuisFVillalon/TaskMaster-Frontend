@@ -13,12 +13,12 @@ These variables and handlers manage all user interactions related to task and ta
 */
 
 import React from 'react';
-import { FilterType, NewTaskForm, EditTaskForm, Tag, EditTaskModalState, Task, NewTag } from '@/app/types/task';
+import { FilterType, EditTaskForm, Tag, EditTaskModalState, Task, NewTag, BaseTaskForm } from '@/app/types/task';
 
 interface UseTaskHandlersProps {
   // State setters
   setShowNewTaskModal: (show: boolean) => void;
-  setNewTask: React.Dispatch<React.SetStateAction<NewTaskForm>>;
+  setNewTask: React.Dispatch<React.SetStateAction<BaseTaskForm>>;
   setNewAITask: React.Dispatch<React.SetStateAction<Task>>;
   setShowEditTaskModal: React.Dispatch<React.SetStateAction<EditTaskModalState>>;
   setShowCreateTagModal: (show: boolean) => void;
@@ -29,11 +29,11 @@ interface UseTaskHandlersProps {
   setSortOrder: React.Dispatch<React.SetStateAction<Record<FilterType, 'asc' | 'desc'>>>;
   setSelectedTags: React.Dispatch<React.SetStateAction<Tag[]>>;
   setFilter: React.Dispatch<React.SetStateAction<FilterType>>;
-  setAiPlan: React.Dispatch<React.SetStateAction<Task[] | undefined>>;
+  setAiPlan: React.Dispatch<React.SetStateAction<Task[]>>;
   setDisplayAISubTasks: React.Dispatch<React.SetStateAction<boolean>>;
 
   // Current state values
-  newTask: NewTaskForm;
+  newTask: BaseTaskForm;
   newAITask: Task;
   showEditTaskModal: EditTaskModalState;
   newTag: {name: string; color: string };
@@ -42,12 +42,12 @@ interface UseTaskHandlersProps {
   selectedTags: Tag[];
 
   // API functions
-  addTask: (task: NewTaskForm) => Promise<boolean>;
+  addTask: (task: BaseTaskForm) => Promise<boolean>;
   updateTask: (id: number, task: EditTaskForm) => Promise<boolean>;
   addTag: (tag: {name: string; color: string }) => Promise<Tag | false>;
   updateTag: (tag: Tag) => Promise<number | null>;
   delTag: (tag: Tag) => Promise<number | null>;
-  sendTaskToAI: (task: Task) => Promise<{
+  sendTaskToAI: (task: BaseTaskForm) => Promise<{
     new_task: Task;
     subtasks: Task[];
   }>;
@@ -100,6 +100,7 @@ export const useTaskHandlers = ({
         setShowNewTaskModal(false);
 
         setNewTask({
+          id: 0,
           title: '',
           description: '',
           urgent: false,
@@ -109,13 +110,13 @@ export const useTaskHandlers = ({
           category: null,
           estimated_time: null,
           complexity: null,
-          created_time: '',
+          created_date: '',
         });
       
     }
   };
 
-  const handleNewAITask = async (aiTask: Task) => {
+  const handleNewAITask = async (aiTask: BaseTaskForm) => {
     if (!aiTask.title.trim()) {
       alert("Title is required.");
       return;
@@ -140,32 +141,45 @@ export const useTaskHandlers = ({
       }
 
       const success_task_send_to_ai = await sendTaskToAI(aiTask);
+      console.log(success_task_send_to_ai)
+      const now = new Date().toISOString();
 
+      // ✅ Flatten into proper Task[]
       const all_ai_tasks: Task[] = [
         success_task_send_to_ai.new_task,
-        ...success_task_send_to_ai.subtasks
+        ...success_task_send_to_ai.subtasks.map(task => ({
+          ...task,
+          created_date: now,
+        })),
       ];
+      const sortedTasks = [...all_ai_tasks].sort((a, b) => {
+        // If one task has no due_date, push it to the bottom
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
 
-      setAiPlan(all_ai_tasks);
-      setDisplayAISubTasks(true)
-      if (success_task_send_to_ai) {
-        console.log("success sending task to ai");
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      });
+      console.log(sortedTasks)
+      setAiPlan(sortedTasks);
+      setDisplayAISubTasks(true);
 
-        setShowNewTaskModal(false);
+      console.log("success sending task to ai");
 
-        setNewTask({
-          title: '',
-          description: '',
-          urgent: false,
-          due_date: '',
-          due_time: '',
-          tags: [],
-          category: null,
-          estimated_time: null,
-          complexity: null,
-          created_time: '',
-        });
-      }
+      setShowNewTaskModal(false);
+
+      setNewTask({
+        id: 0,
+        title: '',
+        description: '',
+        urgent: false,
+        due_date: '',
+        due_time: '',
+        tags: [],
+        category: null,
+        estimated_time: null,
+        complexity: null,
+        created_date: '',
+      });
     }
   };
 
@@ -174,7 +188,7 @@ export const useTaskHandlers = ({
 
     if (!showEditTaskModal.task) return;
     const taskData: EditTaskForm = {
-      // user_id: showEditTaskModal.task.user_id,
+      id: showEditTaskModal.task.user_id | 0,
       title: showEditTaskModal.task.title,
       description: showEditTaskModal.task.description,
       urgent: showEditTaskModal.task.urgent,
@@ -194,6 +208,7 @@ export const useTaskHandlers = ({
       completed_date: showEditTaskModal.task.completed_date,
       complexity: showEditTaskModal.task.complexity ?? 0,
       estimated_time: showEditTaskModal.task.estimated_time ?? null,
+      created_date: showEditTaskModal.task.created_date
     };
 
     const success = await updateTask(showEditTaskModal.task.id, taskData);
@@ -207,7 +222,7 @@ export const useTaskHandlers = ({
 
     const tag = await addTag(newTag);
     if (tag) {
-      setNewTask(prev => ({
+      setNewTask((prev: BaseTaskForm) => ({
         ...prev,
         tags: [...prev.tags, tag]
       }));
@@ -249,7 +264,7 @@ export const useTaskHandlers = ({
   };
 
   const toggleTag = (tag: Tag) => {
-    setNewTask(prev => {
+    setNewTask((prev: BaseTaskForm) => {
       const exists = prev.tags.some(t => t.id === tag.id);
 
       return {

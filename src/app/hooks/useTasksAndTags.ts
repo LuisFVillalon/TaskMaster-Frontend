@@ -17,13 +17,13 @@ import { fetchTasks,
     onDelete, 
     onDeleteTag,
     updateTag as updateTagApi,
-    // updateCompleteTask, 
+    saveTasksToDBAPI, 
     updateWholeTask
 } from "@/app/lib/backend-api";
 import { 
     sendNewTaskToAIAPI
 } from "@/app/lib/ai-api";
-import { Task, Tag, NewTaskForm, EditTaskForm, NewTag } from '@/app/types/task';
+import { Task, Tag, BaseTaskForm, EditTaskForm, NewTag } from '@/app/types/task';
 // Helper function to format date in local timezone (not UTC)
 const getLocalISOString = (date: Date): string => {
   const year = date.getFullYear();
@@ -152,7 +152,7 @@ export const useTasks = (demo: boolean = false) => {
     }
   };
 
-  const addTask = async (newTask: NewTaskForm) => {
+  const addTask = async (newTask: BaseTaskForm) => {
     if (demo) {
       const createdTask: Task = {
         user_id: 98,
@@ -174,6 +174,12 @@ export const useTasks = (demo: boolean = false) => {
     try {
         const taskWithDates = {
           ...newTask,
+          due_date: newTask.due_date instanceof Date
+            ? newTask.due_date.toISOString().slice(0, 10)
+            : (newTask.due_date ?? undefined),
+          due_time: newTask.due_time instanceof Date
+            ? newTask.due_time.toISOString().slice(11, 16)
+            : (newTask.due_time ?? undefined),
           created_date: getLocalISOString(new Date()),
           completed_date: null,
           completed: false
@@ -189,26 +195,39 @@ export const useTasks = (demo: boolean = false) => {
     }
   }; 
 
-  const sendTaskToAI = async (newAITask: Task) => {
+  const addTasks = async (newTasks: Task[]) => {
+
     try {
-        const normalizedTask = {
-          ...newAITask,
-          due_date: newAITask.due_date instanceof Date
-            ? newAITask.due_date.toISOString().slice(0, 10)
-            : (newAITask.due_date ?? ''),
-          due_time: newAITask.due_time instanceof Date
-            ? newAITask.due_time.toISOString().slice(11, 16)
-            : (newAITask.due_time ?? ''),
-          category: newAITask.category ?? undefined,
-          created_date: newAITask.created_date instanceof Date
-            ? getLocalISOString(newAITask.created_date)
-            : (newAITask.created_date ?? ''),
-          completed_date: newAITask.completed_date instanceof Date
-            ? getLocalISOString(newAITask.completed_date)
-            : newAITask.completed_date,
-          estimated_time: newAITask.estimated_time ?? 0,
-          complexity: newAITask.complexity ?? 1,
-        };
+
+        await saveTasksToDBAPI(newTasks);
+        return true;
+    } catch (err) {
+        console.error(err);
+        alert("Failed to create tasks");
+        return false;
+    }
+  };  
+
+  const sendTaskToAI = async (newAITask: BaseTaskForm) => {
+    try {
+const normalizedTask = {
+  ...newAITask,
+  user_id: 0,
+  completed: false,
+  due_date: newAITask.due_date instanceof Date
+    ? newAITask.due_date.toISOString().slice(0, 10)
+    : (newAITask.due_date ?? ''),
+  due_time: newAITask.due_time instanceof Date
+    ? newAITask.due_time.toISOString().slice(11, 16)
+    : (newAITask.due_time ?? ''),
+  category: newAITask.category ?? undefined,
+  created_date: newAITask.created_date instanceof Date
+    ? getLocalISOString(newAITask.created_date)
+    : (newAITask.created_date ?? ''),
+  completed_date: null,
+  estimated_time: newAITask.estimated_time ?? 0,
+  complexity: newAITask.complexity ?? 1,
+};
         const aiTasks = await sendNewTaskToAIAPI(normalizedTask);
         return aiTasks;
     } catch (err) {
@@ -236,18 +255,6 @@ export const useTasks = (demo: boolean = false) => {
     }
   };
 
-  // const updateCompleteStatus = async (id_task: number) => {
-  //   if (demo) return true;
-  //   try {
-  //       await updateCompleteTask(id_task);
-  //       return true;
-  //   } catch (err) {
-  //       console.error('Delete failed:', err);
-  //       alert("Failed to update complete status on task");
-  //       return false;
-  //   }
-  // };
-
   const updateTask = async (id: number, updatedTask: EditTaskForm) => {
     if (demo) {
       setTasks(prev => prev.map(task => task.id === id ? { ...task, ...updatedTask } : task));
@@ -256,8 +263,19 @@ export const useTasks = (demo: boolean = false) => {
     try {
         const taskToUpdate = {
           ...updatedTask,
+          due_date: updatedTask.due_date instanceof Date
+            ? updatedTask.due_date.toISOString().slice(0, 10)
+            : (updatedTask.due_date ?? undefined),
+          due_time: updatedTask.due_time instanceof Date
+            ? updatedTask.due_time.toISOString().slice(11, 16)
+            : (updatedTask.due_time ?? undefined),
+          created_date: updatedTask.created_date instanceof Date
+            ? getLocalISOString(updatedTask.created_date)
+            : updatedTask.created_date,
           tags: updatedTask.tags.map(tag => ({ id: tag.id, name: tag.name, color: tag.color })),
-          completed_date: updatedTask.completed_date instanceof Date ? updatedTask.completed_date.toISOString() : updatedTask.completed_date,
+          completed_date: updatedTask.completed_date instanceof Date
+            ? updatedTask.completed_date.toISOString()
+            : updatedTask.completed_date,
           category: updatedTask.category ?? null
         };
         const updated = await updateWholeTask(id, taskToUpdate) as Task;
@@ -278,7 +296,8 @@ export const useTasks = (demo: boolean = false) => {
     setTasks,
     deleteTask,
     updateTask,
-    sendTaskToAI
+    sendTaskToAI,
+    addTasks
   };
 };
 

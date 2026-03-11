@@ -18,7 +18,7 @@ These variables maintain the application's UI state across components.
 */
 
 import { useState } from 'react';
-import { Task, FilterType, NewTaskForm, Tag, EditTaskModalState, NewTag } from '@/app/types/task';
+import { Task, FilterType, Tag, EditTaskModalState, NewTag, BaseTaskForm} from '@/app/types/task';
 
 export const useTaskManagerState = () => {
   const [sortOrder, setSortOrder] = useState<Record<FilterType, 'asc' | 'desc'>>({
@@ -32,7 +32,7 @@ export const useTaskManagerState = () => {
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [aiPlan, setAiPlan] = useState<Task[] | undefined>([]);
+  const [aiPlan, setAiPlan] = useState<Task[]>([]);
   const [displayAISubTasks, setDisplayAISubTasks]= useState(false);
 
   // Modal states
@@ -50,7 +50,8 @@ export const useTaskManagerState = () => {
     name: '',
     color: '#3B82F6'
   });
-  const [newTask, setNewTask] = useState<NewTaskForm>({
+  const [newTask, setNewTask] = useState<BaseTaskForm>({
+    id: 0,
     title: '',
     description: '',
     urgent: false,
@@ -58,9 +59,9 @@ export const useTaskManagerState = () => {
     due_time: '',
     tags: [],
     category: null,
-    created_time: '',
     estimated_time: 0,
-    complexity: null
+    complexity: null,
+    created_date: '',
   });
   const [newAITask, setNewAITask] = useState<Task>();  
 

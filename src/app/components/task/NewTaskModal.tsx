@@ -1,19 +1,19 @@
 import React, { Dispatch, SetStateAction, useState } from 'react';
 import { X, Calendar, Clock, AlertCircle, Loader2 } from 'lucide-react';
-import { NewTaskForm, Tag, TaskCategory, Task } from '@/app/types/task';
+import { BaseTaskForm, Tag, TaskCategory, Task } from '@/app/types/task';
 
 interface NewTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  newTask: NewTaskForm;
-  onTaskChange: (task: NewTaskForm) => void;
+  newTask: BaseTaskForm;
+  onTaskChange: (task: BaseTaskForm) => void;
   tags: Tag[];
   onToggleTag: (tag: Tag) => void;
   onSubmit: (e: React.FormEvent) => void;
-  handleNewAITask: (task: Task) => Promise<void>;
+  handleNewAITask: (task: BaseTaskForm) => Promise<void>;
   newAITask: Task | undefined;
   setNewAITask: Dispatch<SetStateAction<Task | undefined>>;
-  setAiPlan: Dispatch<SetStateAction<Task[] | undefined>>;
+  setAiPlan: Dispatch<SetStateAction<Task[]>>;
 }
 
 const NewTaskModal: React.FC<NewTaskModalProps> = ({
@@ -33,7 +33,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
   if (!isOpen) return null;
   const isAIMode = !!newTask.category;
 
-  const handleTaskChange = (updatedTask: NewTaskForm) => {
+  const handleTaskChange = (updatedTask: BaseTaskForm) => {
     onTaskChange(updatedTask);
     setNewAITask((prev) => ({
       ...prev,
@@ -264,7 +264,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                 <input
                   type="date"
                   required={isAIMode}
-                  value={newTask.due_date}
+                  value={newTask.due_date ? String(newTask.due_date) : ''}
                   onChange={(e) => handleTaskChange({ ...newTask, due_date: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-black"
                 />
@@ -279,7 +279,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({
                 <input
                   type="time"
                   required={isAIMode}                  
-                  value={newTask.due_time}
+                  value={newTask.due_date ? String(newTask.due_date) : ''}
                   onChange={(e) => handleTaskChange({ ...newTask, due_time: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-black"
                 />

@@ -88,10 +88,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
             )}
 
             <div className="flex items-center gap-1.5">
-                <span className="flex-shrink-0 px-2 sm:px-3 py-0.5 sm:py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    <span className="hidden sm:inline">URGENT</span>
-                </span>
+                {task.urgent && 
+                  <span className="flex-shrink-0 px-2 sm:px-3 py-0.5 sm:py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      <span className="hidden sm:inline">URGENT</span>
+                  </span>                
+                }
                 {/* Edit button */}
                 <button
                     onClick={() =>

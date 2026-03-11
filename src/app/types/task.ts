@@ -55,24 +55,23 @@ export interface Task {
 }
 
 export interface BaseTaskForm {
+  
+  id: number;
   title: string;
   description: string;
   urgent: boolean;
-  due_date: string;
-  due_time: string;
+  due_date: string | Date | null;
+  due_time: string | Date | null;
   tags: Tag[];
   // optional value coming from TaskCategory union
   category?: TaskCategory | null;
   estimated_time?: number | null;
   complexity?: number | null;
   parent_task_id?: number | null;
+  created_date: string | Date;
   // user_id: number;
 }
 
-export interface NewTaskForm extends BaseTaskForm {
-  created_time: string;
-
-}
 
 export interface EditTaskForm extends BaseTaskForm {
   completed: boolean;

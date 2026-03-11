@@ -13,7 +13,7 @@ Functions include:
 
 These functions handle all HTTP interactions with the backend API.
 */
-
+import { Task } from "../types/task";
 const API_BASE_URL = process.env.NEXT_PUBLIC_TASKMASTER_DB_URL!;
 
 export async function fetchTasks() {
@@ -157,6 +157,22 @@ export async function onUpdateTag(id: number, tag: {
 
   if (!res.ok) {
     throw new Error("Failed to update task");
+  }
+
+  return res.json();
+}
+
+export async function saveTasksToDBAPI(tasks: Task[]) {
+  const res = await fetch(`${API_BASE_URL}/save-tasks-list`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(tasks),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to send new task to AI");
   }
 
   return res.json();
