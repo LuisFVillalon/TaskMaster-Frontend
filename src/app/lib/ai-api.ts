@@ -16,5 +16,3 @@ export async function sendNewTaskToAIAPI(task: Task) {
 
   return res.json();
 }
-
-

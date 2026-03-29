@@ -63,7 +63,8 @@ export const useTaskManagerState = () => {
     complexity: null,
     created_date: '',
   });
-  const [newAITask, setNewAITask] = useState<Task>();  
+  const [newAITask, setNewAITask] = useState<Task>();
+  const [listView, setListView] = useState<'list' | 'calendar'>('list');
 
   return {
     // State
@@ -96,6 +97,8 @@ export const useTaskManagerState = () => {
     aiPlan,
     setAiPlan,
     displayAISubTasks,
-    setDisplayAISubTasks
+    setDisplayAISubTasks,
+    listView,
+    setListView,
   };
 };

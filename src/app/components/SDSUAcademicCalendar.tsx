@@ -255,7 +255,3 @@ const SDSUAcademicCalendar: React.FC = () => {
 };
 
 export default SDSUAcademicCalendar;
-
-
-
-

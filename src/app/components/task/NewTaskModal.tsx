@@ -13,7 +13,6 @@ interface NewTaskModalProps {
   handleNewAITask: (task: BaseTaskForm) => Promise<void>;
   newAITask: Task | undefined;
   setNewAITask: Dispatch<SetStateAction<Task | undefined>>;
-  setAiPlan: Dispatch<SetStateAction<Task[]>>;
 }
 
 const NewTaskModal: React.FC<NewTaskModalProps> = ({

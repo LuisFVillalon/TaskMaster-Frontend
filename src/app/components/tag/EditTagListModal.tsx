@@ -25,8 +25,6 @@ import { Tag } from '@/app/types/task';
 interface EditTagModalProps {
   isOpen: boolean;
   onClose: () => void;
-  tag: Tag;
-  onTagChange: (tag: Tag) => void;
   allTags: Tag[];
   onDeleteTag?: (tag: Tag) => void;
   onEditTag?: (tag: Tag) => void;

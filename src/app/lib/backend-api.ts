@@ -83,13 +83,6 @@ export async function onDelete(id: number) {
   .then(data => console.log(data));
 }
 
-export async function updateCompleteTask(id: number) {
-  const url = `${API_BASE_URL}/update-task-status/${id}`
-  fetch(url, {method: "PATCH"})
-  .then(res => res.json())
-  .then(data => console.log(data));
-}
-
 export async function updateWholeTask(id: number, task: {
   title: string;
   description?: string;
@@ -143,25 +136,6 @@ export async function onDeleteTag(id: number) {
   fetch(url, {method: "DELETE"})
   .then(res => res.json())
   .then(data => console.log(data));
-}
-
-export async function onUpdateTag(id: number, tag: {
-  name: string;
-  color?: string;
-}) {
-  const res = await fetch(`${API_BASE_URL}/update-tag/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(tag),
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to update tag");
-  }
-
-  return res.json();
 }
 
 export async function saveTasksToDBAPI(tasks: Task[]) {

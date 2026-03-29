@@ -14,9 +14,8 @@ These variables are used to display task information and handle user interaction
 */
 
 import React from 'react';
-import { Check, Clock, AlertCircle, Trash2, Pencil, BarChart3, Calendar  } from 'lucide-react';
+import { Check, Clock, AlertCircle, Trash2, Pencil, BarChart3, Calendar } from 'lucide-react';
 import { Task } from '@/app/types/task';
-// import { formatDueDate, formatDueTime, getDueDateColor } from '@/app/utils/taskUtils';
 import { getDueColor, getDurationColor, getComplexityColor, formatTime12Hour, formatDueDate } from '@/app/utils/taskUtils';
 
 interface TaskItemProps {
@@ -29,11 +28,10 @@ interface TaskItemProps {
 }
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags, onDeleteTask, onEditTaskClick }) => {
-    const handleDeleteTask = async (taskToDelete: Task) => {
+    const handleDeleteTask = (taskToDelete: Task) => {
         onDeleteTask?.(taskToDelete);
     };
-    const handleEditTask = async (  { status, taskToEdit }: { status: boolean; taskToEdit: Task }
-    ) => {
+    const handleEditTask = ({ status, taskToEdit }: { status: boolean; taskToEdit: Task }) => {
         onEditTaskClick?.({
             status,
             task: taskToEdit,

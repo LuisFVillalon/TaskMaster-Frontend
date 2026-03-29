@@ -1,11 +1,4 @@
-/*
-Purpose: 
-
-Variables Summary:
-*/
-
-
-export interface UserCourse{
+export interface UserCourse {
   id: number;
   name: string;
   course_code: string;

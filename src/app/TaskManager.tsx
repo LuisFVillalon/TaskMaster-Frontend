@@ -47,19 +47,17 @@ import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import Image from 'next/image';
 import CanvasWrapper from '@/app/components/canvas/CanvasWrapper';
 import SDSUAcademicCalendar from '@/app/components/SDSUAcademicCalendar';
-// import { handleClientScriptLoad } from 'next/script';
+import CalendarView from '@/app/components/calendar/CalendarView';
 
 const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
   const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks, sendTaskToAI, addTasks } = useTasks(isDemo);
-  const { 
+  const {
     currentCourseId,
     canvasCourses,
     canvasModules,
     canvasAssignments,
     canvasQuizzes,
-    canvasIsLoading,
     setCurrentCourseId,
-    setCanvasCourses,
     setCanvasModules,
     setCanvasAssignments,
     setCanvasQuizzes,
@@ -84,7 +82,6 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
   const handlers = useTaskHandlers({
     setShowNewTaskModal: state.setShowNewTaskModal,
     setNewTask: state.setNewTask,
-    setNewAITask: state.setNewAITask as React.Dispatch<React.SetStateAction<Task>>,
     setShowEditTaskModal: state.setShowEditTaskModal,
     setShowCreateTagModal: state.setShowCreateTagModal,
     setNewTag: state.setNewTag,
@@ -95,12 +92,9 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
     setSelectedTags: state.setSelectedTags,
     setFilter: state.setFilter,
     newTask: state.newTask,
-    newAITask: state.newAITask!,
     showEditTaskModal: state.showEditTaskModal,
     newTag: state.newTag,
     filter: state.filter,
-    sortOrder: state.sortOrder,
-    selectedTags: state.selectedTags,
     setAiPlan: state.setAiPlan,
     addTask,
     sendTaskToAI,
@@ -112,6 +106,22 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
   });
 
   const { handleNewAITask } = handlers;
+
+  const handleCalendarDayClick = (date: Date) => {
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    state.setNewTask({ ...state.newTask, due_date: dateStr, due_time: '' });
+    state.setShowNewTaskModal(true);
+  };
+
+  const handleCalendarSlotClick = (date: Date, time: string) => {
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    state.setNewTask({ ...state.newTask, due_date: dateStr, due_time: time });
+    state.setShowNewTaskModal(true);
+  };
+
+  const handleCalendarTaskClick = (task: Task) => {
+    state.setShowEditTaskModal({ status: true, task });
+  };
 
   // Filtering and stats
   const { filteredTasks, stats } = useTaskFiltering(
@@ -226,10 +236,38 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
           {/* Task List and Canvas Container - Mobile Responsive */}
           <div className='grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4'>
             
-            {/* Task List - Mobile Optimized with Fixed Height */}
+            {/* Task List / Calendar - Mobile Optimized */}
             <div className="space-y-2 sm:space-y-3 order-1 lg:order-1">
-              <div className='font-bold text-xl sm:text-2xl text-black px-2'>To Do:</div>
-              {filteredTasks.length === 0 ? (
+              {/* Header row: label + view toggle */}
+              <div className="flex items-center justify-between px-2">
+                <div className='font-bold text-xl sm:text-2xl text-black'>
+                  {state.listView === 'list' ? 'To Do:' : 'Calendar:'}
+                </div>
+                <div className="flex rounded-lg overflow-hidden border border-gray-200 text-sm font-medium">
+                  {(['list', 'calendar'] as const).map(v => (
+                    <button
+                      key={v}
+                      onClick={() => state.setListView(v)}
+                      className={`px-3 py-1.5 capitalize transition-colors ${
+                        state.listView === v
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {state.listView === 'calendar' ? (
+                <CalendarView
+                  tasks={tasks}
+                  onDayClick={handleCalendarDayClick}
+                  onSlotClick={handleCalendarSlotClick}
+                  onTaskClick={handleCalendarTaskClick}
+                />
+              ) : filteredTasks.length === 0 ? (
                 <div className="bg-white rounded-lg sm:rounded-xl lg:rounded-2xl p-6 sm:p-8 lg:p-12 text-center shadow-sm border border-gray-100 mt-4">
                   <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
                     <Filter className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-gray-400" />
@@ -275,12 +313,10 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
                   canvasModules={canvasModules}
                   canvasAssignments={canvasAssignments}
                   canvasQuizzes={canvasQuizzes}
-                  canvasIsLoading={canvasIsLoading}
                   setCurrentCourseId={setCurrentCourseId}
-                  setCanvasCourses={setCanvasCourses}
                   setCanvasModules={setCanvasModules}
                   setCanvasAssignments={setCanvasAssignments}
-                  setCanvasQuizzes={setCanvasQuizzes}              
+                  setCanvasQuizzes={setCanvasQuizzes}
                   getCourseModules={getCourseModules}
                   getCourseAssignments={getCourseAssignments}
                   getCourseQuizzes={getCourseQuizzes}
@@ -331,7 +367,6 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
         newAITask={state.newAITask}
         setNewAITask={state.setNewAITask}
         handleNewAITask={handleNewAITask}
-        setAiPlan={state.setAiPlan}
       />
 
       <EditTaskModal
@@ -359,8 +394,6 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
             state.setShowEditTagModal(false);
             state.setEditingTag(null);
           }}
-          tag={state.editingTag}
-          onTagChange={state.setEditingTag}
           allTags={tags}
           onDeleteTag={handlers.handleDeleteTag}
           onEditTag={handlers.handleEditTag}

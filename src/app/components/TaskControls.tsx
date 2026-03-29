@@ -99,15 +99,7 @@ const TaskControls: React.FC<TaskControlsProps> = ({
           {(['all', 'active', 'completed', 'urgent'] as FilterType[]).map(f => (
             <button
               key={f}
-              onClick={() => {
-                if (filter === f) {
-                  // Same filter clicked → toggle sort
-                  onFilterChange(f); // This will trigger sort toggle in parent
-                } else {
-                  // New filter → set filter
-                  onFilterChange(f);
-                }
-              }}
+              onClick={() => onFilterChange(f)}
               className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap text-sm sm:text-base flex-shrink-0 ${
                 filter === f
                   ? 'bg-blue-600 text-white shadow-sm'

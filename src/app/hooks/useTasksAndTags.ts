@@ -377,7 +377,6 @@ export const useTags = (demo: boolean = false) => {
       return delTag.id;
     }
     try {
-        console.log(delTag)
         await onDeleteTag(delTag.id);
         setTags(prev =>
             prev.filter(task => task.id !== delTag.id)

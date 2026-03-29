@@ -19,7 +19,6 @@ interface UseTaskHandlersProps {
   // State setters
   setShowNewTaskModal: (show: boolean) => void;
   setNewTask: React.Dispatch<React.SetStateAction<BaseTaskForm>>;
-  setNewAITask: React.Dispatch<React.SetStateAction<Task>>;
   setShowEditTaskModal: React.Dispatch<React.SetStateAction<EditTaskModalState>>;
   setShowCreateTagModal: (show: boolean) => void;
   setNewTag: React.Dispatch<React.SetStateAction<NewTag>>;
@@ -34,17 +33,14 @@ interface UseTaskHandlersProps {
 
   // Current state values
   newTask: BaseTaskForm;
-  newAITask: Task;
   showEditTaskModal: EditTaskModalState;
-  newTag: {name: string; color: string };
+  newTag: { name: string; color: string };
   filter: FilterType;
-  sortOrder: Record<FilterType, 'asc' | 'desc'>;
-  selectedTags: Tag[];
 
   // API functions
   addTask: (task: BaseTaskForm) => Promise<boolean>;
   updateTask: (id: number, task: EditTaskForm) => Promise<boolean>;
-  addTag: (tag: {name: string; color: string }) => Promise<Tag | false>;
+  addTag: (tag: { name: string; color: string }) => Promise<Tag | false>;
   updateTag: (tag: Tag) => Promise<number | null>;
   delTag: (tag: Tag) => Promise<number | null>;
   sendTaskToAI: (task: BaseTaskForm) => Promise<{
