@@ -184,7 +184,7 @@ export const useTaskHandlers = ({
 
     if (!showEditTaskModal.task) return;
     const taskData: EditTaskForm = {
-      id: showEditTaskModal.task.user_id | 0,
+      id: showEditTaskModal.task.id,
       title: showEditTaskModal.task.title,
       description: showEditTaskModal.task.description,
       urgent: showEditTaskModal.task.urgent,
