@@ -1,22 +1,22 @@
 /**
  * Type augmentation for html2pdf.js.
  *
- * The published @types/html2pdf.js / bundled type.d.ts omits the `pagebreak`
- * option even though the library supports it at runtime.  This declaration
- * merges the missing property into Html2PdfOptions so TypeScript accepts it.
+ * The published type.d.ts omits `pagebreak` even though the library supports
+ * it at runtime.  Importing from the target module makes this file a proper
+ * ES module, which is the requirement for `declare module` to be treated as
+ * an augmentation (merged with the existing declaration) rather than a
+ * competing ambient declaration.
  *
  * Docs: https://ekoopmans.github.io/html2pdf.js/#page-breaks
  */
+import type {} from 'html2pdf.js';
+
 declare module 'html2pdf.js' {
   interface Html2PdfOptions {
     pagebreak?: {
-      /** Strategy for automatic page-break insertion. */
       mode?: ('avoid-all' | 'css' | 'legacy') | ('avoid-all' | 'css' | 'legacy')[];
-      /** CSS selectors whose matching elements always get a break *before* them. */
       before?: string | string[];
-      /** CSS selectors whose matching elements always get a break *after* them. */
       after?: string | string[];
-      /** CSS selectors whose matching elements are never split across pages. */
       avoid?: string | string[];
     };
   }

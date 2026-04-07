@@ -149,6 +149,23 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
     try {
       const { default: html2pdf } = await import('html2pdf.js');
 
+      // Html2PdfOptions in the published type.d.ts omits `pagebreak` even
+      // though the library supports it.  We define a local extension so
+      // TypeScript accepts the option without resorting to `as any`.
+      //
+      // ReturnType / InstanceType<typeof html2pdf> both resolve to Promise<void>
+      // because TypeScript picks the *last* overload.  The Html2PdfStatic.Worker
+      // property is a single-signature constructor (new () => Html2PdfWorker), so
+      // InstanceType of *that* reliably gives us Html2PdfWorker and its set() type.
+      type PdfOptions = Parameters<InstanceType<(typeof html2pdf)['Worker']>['set']>[0] & {
+        pagebreak?: {
+          mode?:   ('avoid-all' | 'css' | 'legacy') | ('avoid-all' | 'css' | 'legacy')[];
+          before?: string | string[];
+          after?:  string | string[];
+          avoid?:  string | string[];
+        };
+      };
+
       const today = new Date().toISOString().split('T')[0];
       const safeTitle = (title || 'Note')
         .replace(/[<>:"/\\|?*]/g, '')
@@ -223,27 +240,32 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         </div>
       `;
 
+      // Stored in a variable so TypeScript applies excess-property checking
+      // against PdfOptions (which includes pagebreak) rather than against
+      // Html2PdfOptions (which doesn't), avoiding a TS2353 build error.
+      const pdfOptions: PdfOptions = {
+        margin: [14, 14, 14, 14],
+        filename,
+        image: { type: 'jpeg', quality: 0.97 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          // Lock the render viewport to A4 width at 96 dpi (794 px).
+          // Without this, html2canvas uses the live browser window width,
+          // which makes page-slice boundaries land at unpredictable positions
+          // relative to the text lines.
+          windowWidth: 794,
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        // 'avoid-all' measures every element's bounding box before slicing
+        // and pushes any element that would be cut to the top of the next page.
+        // This is the primary safeguard against horizontal text clipping.
+        pagebreak: { mode: ['avoid-all'] },
+      };
+
       await html2pdf()
-        .set({
-          margin: [14, 14, 14, 14],
-          filename,
-          image: { type: 'jpeg', quality: 0.97 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            // Lock the render viewport to A4 width at 96 dpi (794 px).
-            // Without this, html2canvas uses the live browser window width,
-            // which makes page-slice boundaries land at unpredictable positions
-            // relative to the text lines.
-            windowWidth: 794,
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          // 'avoid-all' measures every element's bounding box before slicing
-          // and pushes any element that would be cut to the top of the next page.
-          // This is the primary safeguard against horizontal text clipping.
-          pagebreak: { mode: ['avoid-all'] },
-        })
+        .set(pdfOptions)
         .from(container)
         .save();
     } finally {
