@@ -32,6 +32,24 @@ interface AuthContextValue {
   getAccessToken: () => Promise<string | null>;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Returns the canonical base URL for OAuth redirect URIs.
+ *
+ * Resolution order:
+ *  1. NEXT_PUBLIC_SITE_URL  — explicit production URL set in Vercel env vars.
+ *     Use this to lock the redirect to your canonical domain regardless of
+ *     which URL the user happens to be visiting (e.g. a Vercel preview URL).
+ *  2. window.location.origin — correct for localhost in development and for
+ *     Vercel preview deploys when no canonical URL is configured.
+ */
+function getRedirectBase(): string {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (siteUrl) return siteUrl.replace(/\/$/, '');
+  return window.location.origin;
+}
+
 // ── Context ───────────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -72,7 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Supabase embeds this URL in the confirmation email.
           // Without it the dashboard's "Site URL" is used, which may point to
           // production even when running locally.
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${getRedirectBase()}/auth/callback`,
         },
       });
       return { error };
@@ -94,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       options: {
         // After Google redirects back, Supabase will handle the token exchange
         // and then redirect to this URL.
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${getRedirectBase()}/auth/callback`,
       },
     });
     return { error };
