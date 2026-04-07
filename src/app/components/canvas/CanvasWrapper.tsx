@@ -11,12 +11,10 @@ interface CanvasWrapperProps {
     canvasModules: CourseModule[];
     canvasAssignments: CourseAssignment[];
     canvasQuizzes: CourseQuiz[];
-    canvasIsLoading: boolean;
-    setCurrentCourseId: React.Dispatch<React.SetStateAction<number>>;    
-    setCanvasCourses:React.Dispatch<React.SetStateAction<UserCourse[]>>;
-    setCanvasModules:React.Dispatch<React.SetStateAction<CourseModule[]>>;
-    setCanvasAssignments:React.Dispatch<React.SetStateAction<CourseAssignment[]>>;
-    setCanvasQuizzes:React.Dispatch<React.SetStateAction<CourseQuiz[]>>;
+    setCurrentCourseId: React.Dispatch<React.SetStateAction<number>>;
+    setCanvasModules: React.Dispatch<React.SetStateAction<CourseModule[]>>;
+    setCanvasAssignments: React.Dispatch<React.SetStateAction<CourseAssignment[]>>;
+    setCanvasQuizzes: React.Dispatch<React.SetStateAction<CourseQuiz[]>>;
     getCourseModules: (id: number) => Promise<CourseModule[]>;
     getCourseAssignments: (id: number) => Promise<CourseAssignment[]>;
     getCourseQuizzes: (id: number) => Promise<CourseQuiz[]>;
@@ -26,21 +24,19 @@ interface CanvasWrapperProps {
 }
 
 
-const CanvasWrapper: React.FC<CanvasWrapperProps>  = ({
+const CanvasWrapper: React.FC<CanvasWrapperProps> = ({
     currentCourseId,
     canvasCourses,
     canvasModules,
     canvasAssignments,
     canvasQuizzes,
-    // canvasIsLoading,
     setCurrentCourseId,
-    // setCanvasCourses,
     setCanvasModules,
     setCanvasAssignments,
     setCanvasQuizzes,
-    getCourseModules,  
+    getCourseModules,
     getCourseAssignments,
-    getCourseQuizzes, 
+    getCourseQuizzes,
     getCourseModuleItems,
     getCourseAssignmentItems,
     getCourseQuizItems
@@ -99,13 +95,12 @@ const CanvasWrapper: React.FC<CanvasWrapperProps>  = ({
                 canvasCourses={canvasCourses}
                 setActiveView={setActiveView}
                 setCurrentCourseId={setCurrentCourseId}
-                setCurrentCourseDisplay={setCurrentCourseDisplay}
                 setCanvasModules={setCanvasModules}
                 setCanvasAssignments={setCanvasAssignments}
                 setCanvasQuizzes={setCanvasQuizzes}
                 getCourseModules={getCourseModules}
                 getCourseAssignments={getCourseAssignments}
-                getCourseQuizzes={getCourseQuizzes}         
+                getCourseQuizzes={getCourseQuizzes}
                 setItemsIsLoading={setItemsIsLoading}
             />
             <div>

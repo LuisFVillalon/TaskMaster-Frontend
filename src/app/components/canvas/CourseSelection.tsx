@@ -6,31 +6,28 @@ import { UserCourse, CourseAssignment, CourseQuiz, CourseModule} from '@/app/typ
 interface CourseSelectionProps {
     canvasCourses: UserCourse[];
     setActiveView: React.Dispatch<React.SetStateAction<'modules' | 'assignments' | 'quizzes' | ''>>;
-    setCanvasModules:React.Dispatch<React.SetStateAction<CourseModule[]>>;
-    setCanvasAssignments:React.Dispatch<React.SetStateAction<CourseAssignment[]>>;
-    setCanvasQuizzes:React.Dispatch<React.SetStateAction<CourseQuiz[]>>;
-    setCurrentCourseDisplay: React.Dispatch<React.SetStateAction<CourseQuiz[] | CourseModule[] | CourseAssignment[]>>;
+    setCanvasModules: React.Dispatch<React.SetStateAction<CourseModule[]>>;
+    setCanvasAssignments: React.Dispatch<React.SetStateAction<CourseAssignment[]>>;
+    setCanvasQuizzes: React.Dispatch<React.SetStateAction<CourseQuiz[]>>;
     getCourseModules: (id: number) => Promise<CourseModule[]>;
-    getCourseAssignments: (id: number) =>Promise<CourseAssignment[]>;
+    getCourseAssignments: (id: number) => Promise<CourseAssignment[]>;
     getCourseQuizzes: (id: number) => Promise<CourseQuiz[]>;
-    setCurrentCourseId: React.Dispatch<React.SetStateAction<number>>;    
+    setCurrentCourseId: React.Dispatch<React.SetStateAction<number>>;
     setItemsIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 
-const CourseSelection: React.FC<CourseSelectionProps>  = ({
+const CourseSelection: React.FC<CourseSelectionProps> = ({
     canvasCourses,
     setActiveView,
     setCanvasModules,
     setCanvasAssignments,
     setCanvasQuizzes,
-    // setCurrentCourseDisplay,
-    getCourseModules,  
+    getCourseModules,
     getCourseAssignments,
     getCourseQuizzes,
     setCurrentCourseId,
     setItemsIsLoading
-
 }) => {
     const [activeCourseId, setActiveCourseId] = useState<number | null>(null);
     const [currentIndex, setCurrentIndex] = useState(0);

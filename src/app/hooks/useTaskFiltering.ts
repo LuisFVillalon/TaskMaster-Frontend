@@ -32,11 +32,11 @@ export const useTaskFiltering = (
           filter === 'all'
             ? true
             : filter === 'active'
-            ? !Boolean(task.completed)
+            ? !task.completed
             : filter === 'completed'
-            ? Boolean(task.completed)
+            ? task.completed
             : filter === 'urgent'
-            ? Boolean(task.urgent) && !Boolean(task.completed)
+            ? task.urgent && !task.completed
             : true;
 
         // Search filtering

@@ -1,10 +1,3 @@
-/*
-Purpose: 
-
-Variables Summary:
-
-*/
-
 import { useState, useEffect } from 'react';
 import { fetchUserCourses, 
     fetchUserModules, 
@@ -91,22 +84,22 @@ export const useCanvasData = () => {
         const data = await fetchUserAssignmentItems(course_id, assignment_id);
         return data;
     } catch (err) {
-        console.error('Failed to get course module item:', err);
-        alert("Failed to get course module item");
+        console.error('Failed to get course assignment item:', err);
+        alert("Failed to get course assignment item");
         return [];
     }
-  };    
+  };
 
   const getCourseQuizItems = async (course_id: number, quiz_id: number): Promise<CourseQuizItem[]> => {
     try {
         const data = await fetchUserQuizItems(course_id, quiz_id);
         return data;
     } catch (err) {
-        console.error('Failed to get course module item:', err);
-        alert("Failed to get course module item");
+        console.error('Failed to get course quiz item:', err);
+        alert("Failed to get course quiz item");
         return [];
     }
-  };   
+  };
 
   return {
     currentCourseId,
@@ -119,7 +112,7 @@ export const useCanvasData = () => {
     setCanvasCourses,
     setCanvasModules,
     setCanvasAssignments,
-    setCanvasQuizzes,    
+    setCanvasQuizzes,
     getCourseModules,
     getCourseAssignments,
     getCourseQuizzes,
@@ -128,4 +121,3 @@ export const useCanvasData = () => {
     getCourseQuizItems
   };
 };
-

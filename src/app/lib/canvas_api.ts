@@ -93,7 +93,6 @@ export async function fetchUserAssignmentItems(course_id: number, assignment_id:
     }
 
     const data: CourseAssignmentItem[] = await res.json();
-    console.log(data);
     return data;
   } catch (err) {
     console.error(err);

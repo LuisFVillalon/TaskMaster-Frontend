@@ -1,84 +1,141 @@
 /*
-Purpose: This component displays a statistics card showing the count of tasks and their associated tags for a given category (e.g., Total, Active).
+  StatsCard renders one of two distinct stat cards depending on the `variant` prop.
 
-MOBILE-FRIENDLY UPDATES:
-- Responsive layout that stacks vertically on small screens
-- Touch-friendly tag badges with proper spacing
-- Better font scaling for readability
-- Improved grid system that adapts to screen size
-- Enhanced padding and margins for mobile devices
-- Optimized tag overflow handling
-- Better visual hierarchy on small screens
-
-Variables Summary:
-- title: String prop for the title of the stats card (e.g., "Total", "Active").
-- stats: TaskStats object containing an array of tasks and an array of tags with counts.
-- color: Optional string prop for the color used in the count display, defaults to blue.
-
-These variables are used to render the card with the task count in the specified color and a grid of tags showing their names and counts.
+  variant="tasks"  — Total / Completed / In Progress / Urgent counts + per-tag breakdown
+  variant="notes"  — Total / Tagged counts + per-tag note breakdown
 */
 
 import React from 'react';
-import { TaskStats } from '@/app/types/task';
+import { FileText, CheckSquare } from 'lucide-react';
+import { TagStats } from '@/app/types/task';
 
-interface StatsCardProps {
-  title: string;
-  stats: TaskStats;
-  color?: string;
+// ── Prop types ────────────────────────────────────────────────────────────────
+
+type TasksVariant = {
+  variant: 'tasks';
+  total: number;
+  completed: number;
+  active: number;   // in-progress (not completed, not urgent)
+  urgent: number;
+  tags: TagStats[];
+};
+
+type NotesVariant = {
+  variant: 'notes';
+  noteCount: number;
+  taggedCount: number;   // notes that have ≥1 tag
+  noteTags: TagStats[];
+};
+
+type StatsCardProps = TasksVariant | NotesVariant;
+
+// ── Shared sub-components ─────────────────────────────────────────────────────
+
+interface CardShellProps {
+  icon: React.ReactNode;
+  header: string;
+  children: React.ReactNode;
 }
 
-const StatsCard: React.FC<StatsCardProps> = ({ title, stats, color = '#3B82F6' }) => {
+const CardShell: React.FC<CardShellProps> = ({ icon, header, children }) => (
+  <div className="card p-3 sm:p-4 lg:p-5 flex flex-col gap-3">
+    <div className="flex items-center gap-1.5">
+      {icon}
+      <span className="text-[10px] xs:text-xs sm:text-sm text-text-muted font-medium uppercase tracking-wide">
+        {header}
+      </span>
+    </div>
+    {children}
+  </div>
+);
+
+interface StatPillProps {
+  label: string;
+  value: number;
+  color: string;
+}
+
+const StatPill: React.FC<StatPillProps> = ({ label, value, color }) => (
+  <div
+    className="flex flex-col items-start px-3 py-2 rounded-lg"
+    style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+  >
+    <span className="text-[10px] text-text-muted font-medium leading-none mb-1">{label}</span>
+    <span className="text-2xl sm:text-xl lg:text-2xl font-bold leading-none" style={{ color }}>
+      {value}
+    </span>
+  </div>
+);
+
+interface TagChipsProps {
+  tags: TagStats[];
+  icon?: React.ReactNode;
+}
+
+const TagChips: React.FC<TagChipsProps> = ({ tags, icon }) => {
+  if (tags.length === 0) {
+    return <p className="text-[10px] xs:text-xs text-text-muted italic">No tags</p>;
+  }
   return (
-    <div className="text-black bg-white rounded-lg sm:rounded-xl lg:rounded-2xl p-3 sm:p-4 lg:p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-      {/* Mobile: Stack vertically, Desktop: Side by side */}
-      <div className='flex flex-col md:flex-row gap-3 sm:gap-4'>
-        
-        {/* Count Section */}
-        <div className="flex sm:flex-col items-center sm:items-start gap-3 sm:gap-0 min-w-fit">
-          <div className="text-[10px] xs:text-xs sm:text-sm text-gray-600 font-medium uppercase tracking-wide">
-            {title}
-          </div>
-          <p 
-            className="text-3xl sm:text-2xl lg:text-3xl font-bold text-center sm:text-left flex-shrink-0"
-            style={{ color }}
-          >
-            {stats.tasks.length}
-          </p>
+    <div className="flex flex-wrap gap-1.5 sm:gap-x-3 sm:gap-y-1.5">
+      {tags.map(tag => (
+        <span
+          key={tag.name}
+          style={{ backgroundColor: tag.color ?? 'var(--tm-accent)', color: 'white' }}
+          className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md text-[10px] xs:text-xs font-medium whitespace-nowrap shadow-sm hover:shadow transition-shadow"
+        >
+          {icon}
+          {tag.name} ({tag.count})
+        </span>
+      ))}
+    </div>
+  );
+};
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+const StatsCard: React.FC<StatsCardProps> = (props) => {
+
+  if (props.variant === 'tasks') {
+    const { total, completed, active, urgent, tags } = props;
+    return (
+      <CardShell
+        icon={<CheckSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" style={{ color: 'var(--tm-accent)' }} />}
+        header="Tasks"
+      >
+        {/* 2×2 status grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <StatPill label="Total"       value={total}     color="var(--tm-accent)" />
+          <StatPill label="Completed"   value={completed} color="#85BB65" />
+          <StatPill label="In Progress" value={active}    color="#3B82F6" />
+          <StatPill label="Urgent"      value={urgent}    color="#EF4444" />
         </div>
 
-        {/* Tags Section */}
-        {stats.tags.length > 0 && (
-          <div className="flex-1 w-full">
-            {/* Mobile: Single column or wrap, Desktop: Grid */}
-            <div className="flex flex-wrap grid-rows-2 grid-flow-col auto-cols-fr gap-1.5 sm:gap-x-3 sm:gap-y-1.5 lg:gap-x-4 lg:gap-y-2">
-              {stats.tags.map(tag => (
-                <div
-                  key={tag.name}
-                  className="flex items-center justify-start"
-                >
-                  <span
-                    style={{
-                      backgroundColor: tag?.color || '#3B82F6',
-                      color: 'white'
-                    }}
-                    className="inline-flex items-center px-2 sm:px-2.5 lg:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] xs:text-xs sm:text-xs font-medium whitespace-nowrap shadow-sm hover:shadow transition-shadow"
-                  >
-                    {tag.name} ({tag.count})
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Per-tag breakdown */}
+        <TagChips tags={tags} />
+      </CardShell>
+    );
+  }
 
-        {/* Empty State when no tags */}
-        {stats.tags.length === 0 && (
-          <div className="flex-1 flex items-center justify-center py-2 sm:py-0">
-            <p className="text-[10px] xs:text-xs text-gray-400 italic">No tags</p>
-          </div>
-        )}
+  // variant === 'notes'
+  const { noteCount, taggedCount, noteTags } = props;
+  return (
+    <CardShell
+      icon={<FileText className="w-3 h-3 sm:w-3.5 sm:h-3.5" style={{ color: 'var(--tm-accent)' }} />}
+      header="Notes"
+    >
+      {/* 1×2 count row */}
+      <div className="grid grid-cols-2 gap-2">
+        <StatPill label="Total"  value={noteCount}   color="var(--tm-accent)" />
+        <StatPill label="Tagged" value={taggedCount} color="#A855F7" />
       </div>
-    </div>
+
+      {/* Per-tag breakdown */}
+      <TagChips
+        tags={noteTags}
+        icon={<FileText className="w-2.5 h-2.5 flex-shrink-0" />}
+      />
+    </CardShell>
   );
 };
 
