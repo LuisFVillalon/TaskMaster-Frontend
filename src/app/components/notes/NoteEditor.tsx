@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { Bold, Italic, List, ListOrdered, FileText, Save } from 'lucide-react';
+import { Bold, ChevronDown, ChevronUp, Download, FileText, Italic, Library, List, ListOrdered, Loader2, Save } from 'lucide-react';
 import { Note } from '@/app/types/notes';
 import { Tag } from '@/app/types/task';
 
@@ -11,6 +11,8 @@ interface NoteEditorProps {
   note: Note | null;
   allTags: Tag[];
   onUpdate: (id: number, changes: Partial<Pick<Note, 'title' | 'content' | 'tags'>>) => void;
+  showResources?: boolean;
+  onToggleResources?: () => void;
 }
 
 // ─── Toolbar button ────────────────────────────────────────────────────────────
@@ -31,9 +33,23 @@ const ToolbarBtn: React.FC<ToolbarBtnProps> = ({ onClick, active, title, childre
       onClick();
     }}
     title={title}
-    className={`px-2 py-1.5 rounded text-sm transition-colors ${
-      active ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
-    }`}
+    className="px-2 py-1.5 rounded-lg text-sm transition-colors"
+    style={active ? {
+      backgroundColor: 'var(--tm-accent-subtle)',
+      color: 'var(--tm-accent)',
+    } : {
+      color: 'var(--tm-text-secondary)',
+    }}
+    onMouseEnter={e => {
+      if (!active) {
+        (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--tm-surface-raised)';
+      }
+    }}
+    onMouseLeave={e => {
+      if (!active) {
+        (e.currentTarget as HTMLButtonElement).style.backgroundColor = '';
+      }
+    }}
   >
     {children}
   </button>
@@ -41,11 +57,13 @@ const ToolbarBtn: React.FC<ToolbarBtnProps> = ({ onClick, active, title, childre
 
 // ─── NoteEditor ───────────────────────────────────────────────────────────────
 
-const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
+const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showResources = false, onToggleResources }) => {
   const [title, setTitle] = useState(note?.title ?? '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [emptyToast, setEmptyToast] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
 
-  // Refs for debounce timers so we can cancel/reset without triggering re-renders.
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,8 +87,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
     },
   });
 
-  // When the active note changes: cancel in-flight debounces, sync title input,
-  // reset save indicator, and reload editor content imperatively.
+  // Sync to active note — cancel in-flight debounces, update title + editor content.
   useEffect(() => {
     if (contentTimer.current) clearTimeout(contentTimer.current);
     if (titleTimer.current)   clearTimeout(titleTimer.current);
@@ -79,12 +96,10 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
     if (editor) {
       editor.commands.setContent(note?.content ?? '');
     }
-  // `editor` is intentionally excluded: setContent is an imperative call, not
-  // a reactive dependency. The only trigger we want is a note ID change.
+  // `editor` excluded intentionally — setContent is imperative, not reactive.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.id]);
 
-  // Clean up all timers on unmount.
   useEffect(() => {
     return () => {
       if (contentTimer.current) clearTimeout(contentTimer.current);
@@ -92,8 +107,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
       if (savedTimer.current)   clearTimeout(savedTimer.current);
     };
   }, []);
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
@@ -104,7 +117,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
     }, 500);
   };
 
-  // Explicit save: flushes both debounces and triggers the "Saved ✓" flash.
   const handleSave = () => {
     if (!note || !editor) return;
     if (contentTimer.current) clearTimeout(contentTimer.current);
@@ -119,37 +131,158 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
     if (!note) return;
     const exists = note.tags.some(t => t.id === tag.id);
     onUpdate(note.id, {
-      tags: exists
-        ? note.tags.filter(t => t.id !== tag.id)
-        : [...note.tags, tag],
+      tags: exists ? note.tags.filter(t => t.id !== tag.id) : [...note.tags, tag],
     });
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!note || !editor) return;
+
+    // Guard: treat editor as empty if only whitespace / empty paragraph remains
+    if (editor.isEmpty) {
+      setEmptyToast(true);
+      setTimeout(() => setEmptyToast(false), 2500);
+      return;
+    }
+
+    setPdfLoading(true);
+    try {
+      const { default: html2pdf } = await import('html2pdf.js');
+
+      const today = new Date().toISOString().split('T')[0];
+      const safeTitle = (title || 'Note')
+        .replace(/[<>:"/\\|?*]/g, '')
+        .trim()
+        .replace(/\s+/g, '_')
+        .slice(0, 80);
+      const filename = `${safeTitle}_${today}.pdf`;
+
+      // Build a styled container — hard-coded colors so html2canvas
+      // doesn't inherit unresolved CSS custom properties from the dark theme.
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <style>
+          /* ── Base layout ──────────────────────────────────────────────────── */
+          /* Force block display — flex/grid containers confuse html2canvas's
+             page-break measurements and can cause mis-aligned slice boundaries. */
+          .pdf-root, .pdf-body { display: block; }
+          .pdf-root  { font-family: Georgia, serif; padding: 0; color: #1f2937; }
+          .pdf-title { font-size: 26px; font-weight: 700; color: #111827; margin: 0 0 18px; line-height: 1.25; }
+          .pdf-divider { border: none; border-top: 1px solid #e5e7eb; margin: 0 0 18px; }
+
+          /* ── Typography ───────────────────────────────────────────────────── */
+          .pdf-body h1 { font-size: 20px; font-weight: 700; color: #111827; margin: 18px 0 6px; line-height: 1.2; }
+          .pdf-body h2 { font-size: 16px; font-weight: 700; color: #111827; margin: 14px 0 4px; line-height: 1.3; }
+          .pdf-body p  { font-size: 13px; color: #374151; line-height: 1.75; margin: 0 0 10px; }
+          .pdf-body ul, .pdf-body ol { padding-left: 22px; margin: 0 0 10px; color: #374151; }
+          .pdf-body li { font-size: 13px; line-height: 1.65; margin-bottom: 4px; }
+          .pdf-body strong    { font-weight: 700; color: #111827; }
+          .pdf-body em        { font-style: italic; }
+          .pdf-body blockquote { border-left: 3px solid #d1d5db; padding-left: 12px; color: #6b7280; margin: 8px 0; }
+          .pdf-body code      { font-family: monospace; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+
+          /* ── Page-break prevention ────────────────────────────────────────── */
+          /* Paragraphs and list items: never slice a line in half. */
+          .pdf-body p,
+          .pdf-body li,
+          .pdf-body blockquote,
+          .pdf-body pre {
+            break-inside:      avoid;   /* modern spec */
+            page-break-inside: avoid;   /* legacy webkit fallback */
+          }
+
+          /* Widows/orphans: require at least 3 lines at page top and bottom,
+             preventing single "orphan" or "widow" lines being left alone. */
+          .pdf-body p,
+          .pdf-body li {
+            orphans: 3;
+            widows:  3;
+          }
+
+          /* Headings: keep the heading on the same page as the content that
+             follows it — never leave a heading stranded at the bottom of a page. */
+          .pdf-body h1,
+          .pdf-body h2 {
+            break-after:      avoid;
+            page-break-after: avoid;
+            break-inside:      avoid;
+            page-break-inside: avoid;
+          }
+
+          /* List blocks: keep the whole list together when it fits on one page. */
+          .pdf-body ul,
+          .pdf-body ol {
+            break-inside:      avoid;
+            page-break-inside: avoid;
+          }
+        </style>
+        <div class="pdf-root">
+          <h1 class="pdf-title">${title || 'Untitled Note'}</h1>
+          <hr class="pdf-divider" />
+          <div class="pdf-body">${editor.getHTML()}</div>
+        </div>
+      `;
+
+      await html2pdf()
+        .set({
+          margin: [14, 14, 14, 14],
+          filename,
+          image: { type: 'jpeg', quality: 0.97 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            // Lock the render viewport to A4 width at 96 dpi (794 px).
+            // Without this, html2canvas uses the live browser window width,
+            // which makes page-slice boundaries land at unpredictable positions
+            // relative to the text lines.
+            windowWidth: 794,
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          // 'avoid-all' measures every element's bounding box before slicing
+          // and pushes any element that would be cut to the top of the next page.
+          // This is the primary safeguard against horizontal text clipping.
+          pagebreak: { mode: ['avoid-all'] },
+        })
+        .from(container)
+        .save();
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   // ── Empty state ────────────────────────────────────────────────────────────
 
   if (!note) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-white">
+      <div
+        className="flex-1 flex items-center justify-center"
+        style={{ backgroundColor: 'var(--tm-surface)' }}
+      >
         <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileText className="w-8 h-8 text-gray-300" />
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+          >
+            <FileText className="w-8 h-8 text-text-muted" />
           </div>
-          <h3 className="text-base font-semibold text-gray-400 mb-1">No note selected</h3>
-          <p className="text-sm text-gray-400">
-            Select a note from the sidebar or create a new one
-          </p>
+          <h3 className="text-base font-semibold text-text-muted mb-1">No note selected</h3>
+          <p className="text-sm text-text-muted">Select a note from the sidebar or create a new one</p>
         </div>
       </div>
     );
   }
 
-  // ── Editor layout ──────────────────────────────────────────────────────────
-
   return (
-    <div className="flex-1 flex flex-col bg-white overflow-hidden">
-
+    <div
+      className="flex-1 flex flex-col overflow-hidden relative"
+      style={{ backgroundColor: 'var(--tm-surface)' }}
+    >
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 px-4 py-2 border-b border-gray-100 bg-gray-50 flex-wrap">
+      <div
+        className="flex items-center gap-0.5 px-4 py-2 border-b border-border-subtle flex-wrap"
+        style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+      >
         <ToolbarBtn
           onClick={() => editor?.chain().focus().toggleBold().run()}
           active={editor?.isActive('bold') ?? false}
@@ -166,7 +299,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
           <Italic className="w-4 h-4" />
         </ToolbarBtn>
 
-        <div className="w-px h-5 bg-gray-200 mx-1 shrink-0" />
+        <div className="w-px h-5 mx-1 shrink-0" style={{ backgroundColor: 'var(--tm-border)' }} />
 
         <ToolbarBtn
           onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -184,7 +317,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
           <span className="text-xs font-bold leading-none">H2</span>
         </ToolbarBtn>
 
-        <div className="w-px h-5 bg-gray-200 mx-1 shrink-0" />
+        <div className="w-px h-5 mx-1 shrink-0" style={{ backgroundColor: 'var(--tm-border)' }} />
 
         <ToolbarBtn
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
@@ -202,24 +335,74 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
           <ListOrdered className="w-4 h-4" />
         </ToolbarBtn>
 
-        {/* Save — pushed to the far right */}
-        <button
-          onClick={handleSave}
-          className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
-            saveStatus === 'saved'
-              ? 'bg-green-100 text-green-700'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
-          }`}
-        >
-          {saveStatus === 'saved' ? (
-            'Saved ✓'
-          ) : (
-            <>
-              <Save className="w-3.5 h-3.5" />
-              Save
-            </>
+        {/* Download PDF + Smart Resources + Save — pushed to the far right */}
+        <div className="ml-auto flex items-center gap-2">
+          {/* Download PDF */}
+          <button
+            type="button"
+            onClick={handleDownloadPDF}
+            disabled={pdfLoading}
+            title="Download as PDF"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ color: 'var(--tm-text-secondary)' }}
+            onMouseEnter={e => {
+              if (!pdfLoading) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--tm-surface-raised)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = '';
+            }}
+          >
+            {pdfLoading
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <Download className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{pdfLoading ? 'Exporting…' : 'PDF'}</span>
+          </button>
+
+          {onToggleResources && (
+            <button
+              type="button"
+              onClick={onToggleResources}
+              title={showResources ? 'Hide Smart Resources' : 'Show Smart Resources'}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              style={showResources ? {
+                backgroundColor: 'var(--tm-accent-subtle)',
+                color: 'var(--tm-accent)',
+              } : {
+                color: 'var(--tm-text-secondary)',
+              }}
+              onMouseEnter={e => {
+                if (!showResources) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--tm-surface-raised)';
+              }}
+              onMouseLeave={e => {
+                if (!showResources) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '';
+              }}
+            >
+              <Library className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Resources</span>
+            </button>
           )}
-        </button>
+
+          <button
+            onClick={handleSave}
+            className="btn flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium"
+            style={saveStatus === 'saved' ? {
+              backgroundColor: 'var(--tm-success-subtle)',
+              color: 'var(--tm-success)',
+            } : {
+              backgroundColor: 'var(--tm-accent)',
+              color: 'var(--tm-accent-text)',
+            }}
+          >
+            {saveStatus === 'saved' ? (
+              'Saved ✓'
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5" />
+                Save
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* ── Title ────────────────────────────────────────────────────────── */}
@@ -229,61 +412,120 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
           value={title}
           onChange={e => handleTitleChange(e.target.value)}
           placeholder="Untitled Note"
-          className="w-full text-2xl sm:text-3xl font-bold text-gray-900 placeholder-gray-300 focus:outline-none bg-transparent"
+          className="w-full text-2xl sm:text-3xl font-bold text-text-primary placeholder-text-muted focus:outline-none bg-transparent"
         />
       </div>
 
-      {/* ── Tag picker — identical chip pattern to NewTaskModal ──────────── */}
+      {/* ── Tag picker (collapsible) ──────────────────────────────────────── */}
       {allTags.length > 0 && (
-        <div className="px-6 sm:px-10 pb-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4 border border-gray-200 rounded-lg bg-gray-50 max-h-36 overflow-y-auto">
-            {allTags.map(tag => {
-              const selected = note.tags.some(t => t.id === tag.id);
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => handleTagToggle(tag)}
-                  style={{
-                    backgroundColor: selected ? tag.color : '#F5F1EB',
-                    color: selected ? '#ffffff' : '#000000',
-                    transform: selected ? 'scale(1)' : 'scale(0.95)',
-                  }}
-                  className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-100 active:scale-90"
-                >
-                  {tag.name}
-                </button>
-              );
-            })}
+        <div className="px-6 sm:px-10 pb-3">
+          {/* Toggle row */}
+          <button
+            type="button"
+            onClick={() => setTagsOpen(v => !v)}
+            aria-expanded={tagsOpen}
+            aria-controls="note-tag-picker"
+            className="flex items-center gap-1.5 text-xs font-medium mb-2 transition-opacity hover:opacity-70"
+            style={{ color: 'var(--tm-text-muted)' }}
+          >
+            {tagsOpen
+              ? <ChevronUp className="w-3.5 h-3.5" />
+              : <ChevronDown className="w-3.5 h-3.5" />}
+
+            {tagsOpen ? 'Hide tags' : (
+              note.tags.length > 0
+                ? (
+                  <span className="flex items-center gap-1.5">
+                    <span>Tags</span>
+                    {/* Colour dots for selected tags */}
+                    {note.tags.slice(0, 5).map(t => (
+                      <span
+                        key={t.id}
+                        className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: t.color }}
+                        title={t.name}
+                      />
+                    ))}
+                    {note.tags.length > 5 && (
+                      <span>+{note.tags.length - 5}</span>
+                    )}
+                  </span>
+                )
+                : 'Add tags'
+            )}
+          </button>
+
+          {/* Expandable grid */}
+          <div
+            id="note-tag-picker"
+            role="region"
+            aria-label="Tag picker"
+            className="overflow-hidden transition-all duration-200"
+            style={{ maxHeight: tagsOpen ? '160px' : '0px', opacity: tagsOpen ? 1 : 0 }}
+          >
+            <div
+              className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4 rounded-xl border border-border max-h-36 overflow-y-auto scrollbar-custom"
+              style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+            >
+              {allTags.map(tag => {
+                const selected = note.tags.some(t => t.id === tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => handleTagToggle(tag)}
+                    style={{
+                      backgroundColor: selected ? tag.color : 'var(--tm-surface)',
+                      color: selected ? '#ffffff' : 'var(--tm-text-primary)',
+                      border: `1px solid ${selected ? tag.color : 'var(--tm-border)'}`,
+                      transform: selected ? 'scale(1)' : 'scale(0.97)',
+                    }}
+                    className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-100 active:scale-95"
+                  >
+                    {tag.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
 
-      <div className="mx-6 sm:mx-10 border-t border-gray-100" />
+      <div className="mx-6 sm:mx-10 border-t border-border-subtle" />
 
       {/* ── Editor body ──────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-4">
+      <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-4 scrollbar-custom">
         <EditorContent editor={editor} />
       </div>
+
+      {/* ── Empty note toast ─────────────────────────────────────────────── */}
+      {emptyToast && (
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-medium shadow-lg pointer-events-none transition-opacity"
+          style={{ backgroundColor: 'var(--tm-surface-raised)', color: 'var(--tm-text-secondary)', border: '1px solid var(--tm-border)' }}
+        >
+          Note is empty — add some content first.
+        </div>
+      )}
 
       {/* Prose styles scoped to the .notes-editor ProseMirror instance */}
       <style jsx global>{`
         .notes-editor h1 {
           font-size: 1.75rem;
           font-weight: 700;
-          color: #111827;
+          color: var(--tm-text-primary);
           margin: 1rem 0 0.5rem;
           line-height: 1.2;
         }
         .notes-editor h2 {
           font-size: 1.35rem;
           font-weight: 700;
-          color: #1f2937;
+          color: var(--tm-text-primary);
           margin: 0.875rem 0 0.4rem;
           line-height: 1.3;
         }
         .notes-editor p {
-          color: #374151;
+          color: var(--tm-text-secondary);
           line-height: 1.7;
           margin-bottom: 0.5rem;
         }
@@ -291,13 +533,13 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
           list-style-type: disc;
           padding-left: 1.5rem;
           margin-bottom: 0.5rem;
-          color: #374151;
+          color: var(--tm-text-secondary);
         }
         .notes-editor ol {
           list-style-type: decimal;
           padding-left: 1.5rem;
           margin-bottom: 0.5rem;
-          color: #374151;
+          color: var(--tm-text-secondary);
         }
         .notes-editor li {
           margin-bottom: 0.25rem;
@@ -305,7 +547,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate }) => {
         }
         .notes-editor strong {
           font-weight: 700;
-          color: #111827;
+          color: var(--tm-text-primary);
         }
         .notes-editor em {
           font-style: italic;

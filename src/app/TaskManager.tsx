@@ -28,10 +28,12 @@ These variables are used to render the UI components and handle user interaction
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/app/context/AuthContext';
+import { claimOrphanedData } from '@/app/lib/backend-api';
 import { Task } from '@/app/types/task';
 import { useTasks, useTags } from '@/app/hooks/useTasksAndTags';
-import { useCanvasData } from './hooks/useCanvasData';
 import { useTaskManagerState } from '@/app/hooks/useTaskManagerState';
 import { useTaskHandlers } from '@/app/hooks/useTaskHandlers';
 import { useTaskFiltering } from '@/app/hooks/useTaskFiltering';
@@ -43,37 +45,76 @@ import NewTaskModal from '@/app/components/task/NewTaskModal';
 import EditTaskModal from '@/app/components/task/EditTaskModal';
 import CreateTagModal from '@/app/components/tag/CreateTagModal';
 import EditTagModal from '@/app/components/tag/EditTagListModal';
-import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
-import Image from 'next/image';
-import CanvasWrapper from '@/app/components/canvas/CanvasWrapper';
-import SDSUAcademicCalendar from '@/app/components/SDSUAcademicCalendar';
+import { Filter, ChevronDown, ChevronUp, FileText, Settings } from 'lucide-react';
+import BigPictureCalendar from '@/app/components/BigPictureCalendar';
 import CalendarView from '@/app/components/calendar/CalendarView';
+import SettingsModal from '@/app/components/SettingsModal';
+import NoteItem from '@/app/components/notes/NoteItem';
+import { useNotes } from '@/app/hooks/useNotes';
+import BriefingCard from '@/app/components/BriefingCard';
+import { useGoogleCalendar } from '@/app/hooks/useGoogleCalendar';
+import GoogleEventModal from '@/app/components/calendar/GoogleEventModal';
+import { GoogleCalendarEvent } from '@/app/types/calendar';
 
 const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
+  const router = useRouter();
+  const { signOut, user } = useAuth();
+
+  // ── One-time orphaned-data claim ────────────────────────────────────────────
+  // Runs once per user account (guarded by a localStorage flag).
+  // Fixes any account that signed up before claim-data was wired to the login
+  // flow — including the current session — without requiring a re-login.
+  const claimRan = useRef(false);
+  useEffect(() => {
+    if (!user || claimRan.current) return;
+    const flagKey = `taskmaster_claimed_${user.id}`;
+    if (localStorage.getItem(flagKey)) return;  // already ran for this account
+    claimRan.current = true;
+
+    claimOrphanedData().then(claimed => {
+      if (claimed) {
+        // Mark as done so we never call this again for this account.
+        localStorage.setItem(flagKey, '1');
+        const total = claimed.tasks + claimed.notes + claimed.tags + claimed.calendar_settings;
+        if (total > 0) {
+          // Data was found and linked — reload so tasks/notes lists refresh.
+          console.info(`[claim-data] Linked ${claimed.tasks} tasks, ${claimed.notes} notes to account.`);
+          window.location.reload();
+        } else {
+          // Nothing to claim — still mark as done to skip future attempts.
+          localStorage.setItem(flagKey, '1');
+        }
+      }
+    });
+  }, [user]);
+
+  const handleLogout = async () => {
+    // 1. Destroy the Supabase session (clears the JWT from storage).
+    await signOut();
+    // 2. Clear any user-specific cached data so the next user starts clean.
+    //    Wipe every taskmaster_* key rather than individual keys so nothing
+    //    leaks if new cache keys are added later.
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('taskmaster_'))
+      .forEach(k => localStorage.removeItem(k));
+    // 3. Navigate to login — this unmounts the entire app, wiping all
+    //    in-memory state (BriefingCard, ResourceSidebar, task list, etc.).
+    router.replace('/login');
+  };
   const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks, sendTaskToAI, addTasks } = useTasks(isDemo);
-  const {
-    currentCourseId,
-    canvasCourses,
-    canvasModules,
-    canvasAssignments,
-    canvasQuizzes,
-    setCurrentCourseId,
-    setCanvasModules,
-    setCanvasAssignments,
-    setCanvasQuizzes,
-    getCourseModules,
-    getCourseAssignments,
-    getCourseQuizzes,
-    getCourseModuleItems,
-    getCourseAssignmentItems,
-    getCourseQuizItems
-  } = useCanvasData();
+
   const { tags, tagsLoading, addTag, delTag, updateTag } = useTags(isDemo);
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [activeGoogleEvent, setActiveGoogleEvent] = useState<GoogleCalendarEvent | null>(null);
+  const { gcalStatus, googleEvents, googleSyncing, gcalError, connectGcal, disconnectGcal, syncGcal } = useGoogleCalendar();
 
   // Mobile-specific state
   const [showStats, setShowStats] = useState(false);
   const [showCal, setShowCal] = useState(false);
-  const [showCanvas, setShowCanvas] = useState(true);
+
+  // View toggle: 'tasks' shows the task list + calendar; 'notes' shows NotesView
+  const [viewMode, setViewMode] = useState<'tasks' | 'notes'>('tasks');
 
   // State management
   const state = useTaskManagerState();
@@ -132,12 +173,50 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
     state.selectedTags
   );
 
+  // Notes state — use raw notes so TaskManager can filter them with the shared
+  // selectedTags / searchTerm state from TaskControls instead of the hook's own.
+  const { notes: allNotes, deleteNote } = useNotes();
+  const [activeNoteId, setActiveNoteId] = useState<number | null>(null);
+
+  // Per-tag note counts for the Total StatsCard
+  const noteTags = useMemo(() => {
+    const map: Record<number, { name: string; color: string; count: number }> = {};
+    allNotes.forEach(note => {
+      note.tags?.forEach(tag => {
+        if (!map[tag.id]) map[tag.id] = { name: tag.name, color: tag.color, count: 0 };
+        map[tag.id].count += 1;
+      });
+    });
+    return Object.values(map);
+  }, [allNotes]);
+
+  const filteredNotes = useMemo(() => {
+    let result = allNotes;
+    if (state.selectedTags.length > 0) {
+      result = result.filter(note =>
+        state.selectedTags.some(st => note.tags.some(nt => nt.id === st.id)),
+      );
+    }
+    if (state.searchTerm.trim()) {
+      const lower = state.searchTerm.toLowerCase();
+      result = result.filter(
+        note =>
+          note.title.toLowerCase().includes(lower) ||
+          note.content.replace(/<[^>]+>/g, '').toLowerCase().includes(lower),
+      );
+    }
+    return result;
+  }, [allNotes, state.selectedTags, state.searchTerm]);
+
   if (isLoading || tagsLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading {isLoading ? 'tasks' : 'tags'}...</p>
+          <div
+            className="w-16 h-16 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-4"
+            style={{ borderColor: 'var(--tm-accent)', borderTopColor: 'transparent' }}
+          />
+          <p className="text-text-secondary">Loading {isLoading ? 'tasks' : 'tags'}…</p>
         </div>
       </div>
     );
@@ -145,67 +224,78 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
 
   return (
     <>
-      <div className="min-h-screen bg-[#EFE7DD]">
+      <div className="min-h-screen bg-bg">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-10">
           {/* Header - Mobile Optimized */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:mb-4 sm:gap-0">
             <div className="flex items-center gap-2 sm:gap-3">
-                <div className="flex items-center">
-                  <div className="relative w-14 h-14 sm:w-16 sm:h-16 lg:w-32 lg:h-32 xl:w-40 xl:h-40">
-                    <Image
-                      src="/icon.svg"
-                      alt="Favicon"
-                      fill
-                      className="object-contain"
-                      priority
-                    />
-                  </div>
-                </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold text-gray-900">Task Master</h1>
-                <p className="text-xs sm:text-sm lg:text-base text-gray-600">Manage your work, stay productive</p>
+                <h1 className="text-2xl sm:text-3xl lg:text-5xl font-bold text-text-primary">Promptly</h1>
+                <p className="text-xs sm:text-sm lg:text-base text-text-secondary">Less planning, more doing.</p>
               </div>
             </div>
-            <button
-              onClick={() => {
-                localStorage.removeItem('taskmaster_authenticated');
-                window.location.reload();
-              }}
-              className="px-3 py-2 sm:px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs sm:text-sm font-medium w-full sm:w-auto"
-            >
-              Logout
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="btn px-3 py-2 sm:px-4 rounded-lg text-xs sm:text-sm font-medium w-full sm:w-auto flex items-center gap-1.5"
+                style={{ backgroundColor: 'var(--tm-surface-raised)', color: 'var(--tm-text-secondary)', border: '1px solid var(--tm-border)' }}
+                title="Account Settings"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="btn px-3 py-2 sm:px-4 text-white rounded-lg text-xs sm:text-sm font-medium w-full sm:w-auto"
+                style={{ backgroundColor: 'var(--tm-danger)' }}
+              >
+                Logout
+              </button>
+            </div>
           </div>
+
+          {/* Daily Briefing */}
+          <BriefingCard tasks={tasks} notes={allNotes} />
 
           {/* Academic Calendar & Stats Cards - Mobile Responsive */}
           <div className='grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6'>
             {/* Academic Calendar - Hidden on mobile, shown on larger screens */}
-            <button 
+            <button
                 onClick={() => setShowCal(!showCal)}
-                className="text-black lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
+                className="lg:hidden w-full flex items-center justify-between p-3 card mb-2"
               >
-                <span className="font-semibold text-gray-900">Academic Calendar</span>
+                <span className="font-semibold text-text-primary">Academic Calendar</span>
                 {showCal ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
             </button>
             <div className={`${!showCal ? 'hidden lg:grid' : ''}`}>
-              <SDSUAcademicCalendar/>
+              <BigPictureCalendar/>
             </div>
             
             {/* Stats Cards - Collapsible on mobile */}
             <div className="w-full lg:w-auto">
-              <button 
+              <button
                 onClick={() => setShowStats(!showStats)}
-                className="text-black lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
+                className="lg:hidden w-full flex items-center justify-between p-3 card mb-2"
               >
-                <span className="font-semibold text-gray-900">Statistics</span>
+                <span className="font-semibold text-text-primary">Statistics</span>
                 {showStats ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
               </button>
               
-              <div className={`grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-1 gap-2 sm:gap-3 lg:gap-4 ${!showStats ? 'hidden lg:grid' : ''}`}>
-                <StatsCard title="Total" stats={stats.total} />
-                <StatsCard title="Active" stats={stats.active} color="#3B82F6" />
-                <StatsCard title="Done" stats={stats.completed} color="#85BB65" />
-                <StatsCard title="Urgent" stats={stats.urgent} color="#FF0000" />
+              <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 sm:gap-3 lg:gap-4 ${!showStats ? 'hidden lg:grid' : ''}`}>
+                <StatsCard
+                  variant="tasks"
+                  total={stats.total.tasks.length}
+                  completed={stats.completed.tasks.length}
+                  active={stats.active.tasks.length}
+                  urgent={stats.urgent.tasks.length}
+                  tags={stats.total.tags}
+                />
+                <StatsCard
+                  variant="notes"
+                  noteCount={allNotes.length}
+                  taggedCount={allNotes.filter(n => n.tags.length > 0).length}
+                  noteTags={noteTags}
+                />
               </div>
             </div>
           </div>
@@ -230,111 +320,138 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
                   handlers.openEditTagModal(tags[0]);
                 }
               }}
+              searchPlaceholder={viewMode === 'notes' ? 'Search notes…' : 'Search tasks…'}
             />
           </div>
 
-          {/* Task List and Canvas Container - Mobile Responsive */}
-          <div className='grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4'>
-            
-            {/* Task List / Calendar - Mobile Optimized */}
-            <div className="space-y-2 sm:space-y-3 order-1 lg:order-1">
-              {/* Header row: label + view toggle */}
+          {/* Task List / Note List and Calendar — two-column layout */}
+          <div className="flex flex-col lg:flex-row gap-6 w-full">
+
+            {/* LEFT COLUMN: Task List or Note List */}
+            <div className="flex-1 space-y-2 sm:space-y-3">
+
+              {/* Header: dynamic title on the left, view toggle on the right */}
               <div className="flex items-center justify-between px-2">
-                <div className='font-bold text-xl sm:text-2xl text-black'>
-                  {state.listView === 'list' ? 'To Do:' : 'Calendar:'}
+                <div className="font-bold text-xl sm:text-2xl text-text-primary">
+                  {viewMode === 'tasks' ? 'To Do:' : 'Notes:'}
                 </div>
-                <div className="flex rounded-lg overflow-hidden border border-gray-200 text-sm font-medium">
-                  {(['list', 'calendar'] as const).map(v => (
-                    <button
-                      key={v}
-                      onClick={() => state.setListView(v)}
-                      className={`px-3 py-1.5 capitalize transition-colors ${
-                        state.listView === v
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
+                <div
+                  className="inline-flex items-center gap-1 p-1 rounded-lg"
+                  style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+                >
+                  <button
+                    onClick={() => setViewMode('tasks')}
+                    className="px-4 py-1 text-sm font-semibold rounded-md transition-all"
+                    style={
+                      viewMode === 'tasks'
+                        ? { backgroundColor: 'var(--tm-accent)', color: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.18)' }
+                        : { color: 'var(--tm-text-secondary)', backgroundColor: 'transparent' }
+                    }
+                  >
+                    Tasks
+                  </button>
+                  <button
+                    onClick={() => setViewMode('notes')}
+                    className="px-4 py-1 text-sm font-semibold rounded-md transition-all"
+                    style={
+                      viewMode === 'notes'
+                        ? { backgroundColor: 'var(--tm-accent)', color: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.18)' }
+                        : { color: 'var(--tm-text-secondary)', backgroundColor: 'transparent' }
+                    }
+                  >
+                    Notes
+                  </button>
                 </div>
               </div>
 
-              {state.listView === 'calendar' ? (
+              {/* Task list */}
+              {viewMode === 'tasks' && (
+                filteredTasks.length === 0 ? (
+                  <div className="card p-6 sm:p-8 lg:p-12 text-center mt-4">
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+                      style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+                    >
+                      <Filter className="w-6 h-6 text-text-muted" />
+                    </div>
+                    <h3 className="text-base font-semibold text-text-primary mb-2">No tasks found</h3>
+                    <p className="text-sm text-text-secondary">Try adjusting your filters</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 overflow-y-auto h-[50vh] lg:h-[600px] pl-2 pr-1 scrollbar-custom">
+                    {filteredTasks.map((task, index) => (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        index={index}
+                        onToggleComplete={toggleComplete}
+                        tags={tags}
+                        onDeleteTask={deleteTask}
+                        onEditTaskClick={() =>
+                          state.setShowEditTaskModal({ status: true, task })
+                        }
+                      />
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* Note list */}
+              {viewMode === 'notes' && (
+                filteredNotes.length === 0 ? (
+                  <div className="card p-6 sm:p-8 lg:p-12 text-center mt-4">
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+                      style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+                    >
+                      <FileText className="w-6 h-6 text-text-muted" />
+                    </div>
+                    <h3 className="text-base font-semibold text-text-primary mb-2">No notes yet</h3>
+                    <p className="text-sm text-text-secondary">Switch to the Notes view to create one</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 overflow-y-auto h-[50vh] lg:h-[600px] pl-2 pr-1 scrollbar-custom">
+                    {filteredNotes.map(note => (
+                      <NoteItem
+                        key={note.id}
+                        note={note}
+                        isActive={note.id === activeNoteId}
+                        onClick={() => router.push(`/notes?id=${note.id}`)}
+                        onDelete={deleteNote}
+                      />
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* RIGHT COLUMN: Calendar View (always visible) */}
+            <div className="flex-1">
+              <div className="font-bold text-xl sm:text-2xl text-text-primary px-2 mb-2 sm:mb-3">
+                Calendar:
+              </div>
+              <div className="h-full">
                 <CalendarView
                   tasks={tasks}
                   onDayClick={handleCalendarDayClick}
                   onSlotClick={handleCalendarSlotClick}
                   onTaskClick={handleCalendarTaskClick}
-                />
-              ) : filteredTasks.length === 0 ? (
-                <div className="bg-white rounded-lg sm:rounded-xl lg:rounded-2xl p-6 sm:p-8 lg:p-12 text-center shadow-sm border border-gray-100 mt-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                    <Filter className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No tasks found</h3>
-                  <p className="text-sm sm:text-base text-gray-600">Try adjusting your filters or search term</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2 overflow-y-auto h-[50vh] sm:h-[60vh] lg:h-[600px] pl-2 pr-1 scrollbar-custom">
-                  {filteredTasks.map((task, index) => (
-                    <TaskItem
-                      key={task.id}
-                      task={task}
-                      index={index}
-                      onToggleComplete={toggleComplete}
-                      tags={tags}
-                      onDeleteTask={deleteTask}
-                      onEditTaskClick={() =>
-                        state.setShowEditTaskModal({
-                          status: true,
-                          task,
-                        })
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Canvas Wrapper - Collapsible on mobile */}
-            <div className="order-2 lg:order-2">
-              <button 
-                onClick={() => setShowCanvas(!showCanvas)}
-                className="text-black lg:hidden w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm mb-2"
-              >
-                <span className="font-semibold text-gray-900">Canvas Integration</span>
-                {showCanvas ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-              </button>
-              
-              <div className={`${!showCanvas ? 'hidden lg:block' : 'block'}`}>
-                <CanvasWrapper
-                  currentCourseId={currentCourseId}
-                  canvasCourses={canvasCourses}
-                  canvasModules={canvasModules}
-                  canvasAssignments={canvasAssignments}
-                  canvasQuizzes={canvasQuizzes}
-                  setCurrentCourseId={setCurrentCourseId}
-                  setCanvasModules={setCanvasModules}
-                  setCanvasAssignments={setCanvasAssignments}
-                  setCanvasQuizzes={setCanvasQuizzes}
-                  getCourseModules={getCourseModules}
-                  getCourseAssignments={getCourseAssignments}
-                  getCourseQuizzes={getCourseQuizzes}
-                  getCourseModuleItems={getCourseModuleItems}
-                  getCourseAssignmentItems={getCourseAssignmentItems}
-                  getCourseQuizItems={getCourseQuizItems}
+                  googleEvents={googleEvents}
+                  onGoogleEventClick={setActiveGoogleEvent}
+                  googleSyncing={googleSyncing}
+                  onSync={gcalStatus === 'connected' ? syncGcal : undefined}
                 />
               </div>
             </div>
           </div>
+          </div>
         </div>
-      </div>
       
       {/* List of sub tasks generated by the AI service */}
       { state.displayAISubTasks &&       
-        <div className="fixed inset-0 z-50 flex items-center justify-center ">
-          <div className="bg-white w-[95%] max-w-2xl rounded-2xl shadow-2xl p-6">
-              <h2 className='text-center font-bold text-black text-3xl pb-4'>Recommended Task Plan:</h2>
+        <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center">
+          <div className="modal-panel w-[95%] max-w-2xl p-6">
+            <h2 className="text-center font-bold text-text-primary text-3xl pb-4">Recommended Task Plan:</h2>
             <div className="flex flex-col gap-2 overflow-y-auto h-[50vh] sm:h-[60vh] lg:h-[600px] pl-2 pr-1 scrollbar-custom">
               {state.aiPlan?.map((task, index) => (
                 <AISubTaskItem
@@ -400,84 +517,21 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
         />
       )}
 
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onAccountDeleted={handleLogout}
+        gcalStatus={gcalStatus}
+        onGcalConnect={connectGcal}
+        onGcalDisconnect={disconnectGcal}
+        gcalError={gcalError}
+      />
 
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-        
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+      <GoogleEventModal
+        event={activeGoogleEvent}
+        onClose={() => setActiveGoogleEvent(null)}
+      />
 
-        /* Custom scrollbar for better mobile experience */
-        .scrollbar-custom {
-          direction: rtl;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
-        }
-
-        .scrollbar-custom > :global(*) {
-          direction: ltr;
-        }
-
-        .scrollbar-custom::-webkit-scrollbar {
-          width: 4px;
-        }
-
-        @media (min-width: 640px) {
-          .scrollbar-custom::-webkit-scrollbar {
-            width: 6px;
-          }
-        }
-
-        .scrollbar-custom::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .scrollbar-custom::-webkit-scrollbar-thumb {
-          background: rgba(148, 163, 184, 0.4);
-          border-radius: 10px;
-          transition: background 0.2s ease;
-        }
-
-        .scrollbar-custom::-webkit-scrollbar-thumb:hover {
-          background: rgba(100, 116, 139, 0.6);
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-
-        /* Touch-friendly tap targets */
-        @media (max-width: 640px) {
-          button {
-            min-height: 44px;
-          }
-        }
-      `}</style>
     </>
   );
 };

@@ -1,34 +1,39 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/app/context/AuthContext';
 import NotesView from '@/app/components/notes/NotesView';
-import PasswordAuth from '@/app/components/PasswordAuth';
 
-// Notes page at /notes.
-// Reuses the same localStorage-based auth check as the root page so a user
-// who hasn't authenticated cannot access the app by navigating directly here.
-
+/**
+ * /notes route — protected by Supabase JWT via AuthContext.
+ *
+ * Mirrors the same auth guard used by the root page.tsx: redirect unauthenticated
+ * visitors to /login rather than showing the legacy PasswordAuth gate.
+ */
 export default function NotesPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('taskmaster_authenticated') === 'true';
-  });
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-  const [isDemo, setIsDemo] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('taskmaster_demo') === 'true';
-  });
-
-  const handleAuthenticated = (demo: boolean) => {
-    localStorage.setItem('taskmaster_authenticated', 'true');
-    localStorage.setItem('taskmaster_demo', demo.toString());
-    setIsAuthenticated(true);
-    setIsDemo(demo);
-  };
-
-  if (!isAuthenticated) {
-    return <PasswordAuth onAuthenticated={handleAuthenticated} />;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--tm-bg)' }}>
+        <div
+          className="w-10 h-10 border-4 border-t-transparent rounded-full animate-spin"
+          style={{ borderColor: 'var(--tm-accent)', borderTopColor: 'transparent' }}
+        />
+      </div>
+    );
   }
 
-  return <NotesView isDemo={isDemo} />;
+  if (!user) {
+    router.replace('/login');
+    return null;
+  }
+
+  return (
+    <Suspense>
+      <NotesView isDemo={false} />
+    </Suspense>
+  );
 }

@@ -1,46 +1,71 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Note } from '@/app/types/notes';
 import { Tag } from '@/app/types/task';
+import {
+  fetchNotes,
+  createNote as apiCreateNote,
+  updateNote as apiUpdateNote,
+  deleteNote as apiDeleteNote,
+} from '@/app/lib/backend-api';
 
 export const useNotes = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Creates a new blank note, prepends it to the list, and returns it so the
+  // Load all notes from the backend once on mount.
+  useEffect(() => {
+    fetchNotes()
+      .then(data => setNotes(data))
+      .catch(() => setError('Failed to load notes'))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  // Creates a new blank note, persists it, prepends it, and returns it so the
   // caller can immediately select it for editing.
-  const addNote = (title = 'Untitled Note'): Note => {
-    const now = new Date().toISOString();
-    const newNote: Note = {
-      id: Math.max(0, ...notes.map(n => n.id)) + 1,
-      title,
-      content: '',
-      tags: [],
-      created_date: now,
-      updated_date: now,
-    };
-    setNotes(prev => [newNote, ...prev]);
-    return newNote;
-  };
+  const addNote = useCallback(async (title = 'Untitled Note'): Promise<Note> => {
+    const created = await apiCreateNote({ title, content: '', tags: [] });
+    setNotes(prev => [created, ...prev]);
+    return created;
+  }, []);
 
   // Accepts a partial update of title, content, or tags.
-  // Always refreshes updated_date so the sidebar sort stays correct.
-  const updateNote = (
-    id: number,
-    changes: Partial<Pick<Note, 'title' | 'content' | 'tags'>>,
-  ) => {
-    setNotes(prev =>
-      prev.map(note =>
-        note.id === id
-          ? { ...note, ...changes, updated_date: new Date().toISOString() }
-          : note,
-      ),
-    );
-  };
+  // Optimistically updates local state, then syncs to the backend.
+  const updateNote = useCallback(
+    async (
+      id: number,
+      changes: Partial<Pick<Note, 'title' | 'content' | 'tags'>>,
+    ) => {
+      // Optimistic update
+      setNotes(prev =>
+        prev.map(note =>
+          note.id === id
+            ? { ...note, ...changes, updated_date: new Date().toISOString() }
+            : note,
+        ),
+      );
+      try {
+        const updated = await apiUpdateNote(id, changes);
+        // Reconcile with the server's authoritative updated_date
+        setNotes(prev => prev.map(note => (note.id === id ? updated : note)));
+      } catch {
+        setError('Failed to save note');
+      }
+    },
+    [],
+  );
 
-  const deleteNote = (id: number) => {
+  const deleteNote = useCallback(async (id: number) => {
+    // Optimistic removal
     setNotes(prev => prev.filter(note => note.id !== id));
-  };
+    try {
+      await apiDeleteNote(id);
+    } catch {
+      setError('Failed to delete note');
+    }
+  }, []);
 
   // Derived filtered list — recomputed only when notes, selectedTags, or
   // searchTerm change. AND semantics for tags: note must have every selected
@@ -50,7 +75,7 @@ export const useNotes = () => {
 
     if (selectedTags.length > 0) {
       result = result.filter(note =>
-        selectedTags.every(st => note.tags.some(nt => nt.id === st.id)),
+        selectedTags.some(st => note.tags.some(nt => nt.id === st.id)),
       );
     }
 
@@ -71,6 +96,8 @@ export const useNotes = () => {
   return {
     notes,
     filteredNotes,
+    isLoading,
+    error,
     addNote,
     updateNote,
     deleteNote,

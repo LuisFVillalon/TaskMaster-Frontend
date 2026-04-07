@@ -2,29 +2,31 @@
 
 import React, { useMemo, useRef, useEffect } from 'react';
 import { Task } from '@/app/types/task';
+import { GoogleCalendarEvent } from '@/app/types/calendar';
 import { formatTime12Hour } from '@/app/utils/taskUtils';
 
 const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0–23
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const SLOT_HEIGHT = 60; // px per hour row
+const GOOGLE_BLUE = '#1a73e8';
 
 interface WeekViewProps {
   currentDate: Date;
   tasks: Task[];
   onSlotClick: (date: Date, time: string) => void;
   onTaskClick: (task: Task) => void;
+  googleEvents?: GoogleCalendarEvent[];
+  onGoogleEventClick?: (event: GoogleCalendarEvent) => void;
 }
 
-// Shared with MonthView — local YYYY-MM-DD key in local timezone.
 const toDateKey = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-// Color priority matches MonthView: completed → gray, first tag, urgent → orange, default → blue.
 const getPillColor = (task: Task): string => {
-  if (task.completed) return '#9CA3AF';
+  if (task.completed) return 'var(--tm-text-muted)';
   if (task.tags.length > 0) return task.tags[0].color;
-  if (task.urgent) return '#F97316';
-  return '#3B82F6';
+  if (task.urgent) return 'var(--tm-warning)';
+  return 'var(--tm-accent)';
 };
 
 const isSameDay = (a: Date, b: Date): boolean =>
@@ -32,7 +34,6 @@ const isSameDay = (a: Date, b: Date): boolean =>
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
-// Normalize due_time (string | Date | null) → hour number or null.
 const getDueTimeHour = (task: Task): number | null => {
   if (!task.due_time) return null;
   const timeStr =
@@ -46,17 +47,28 @@ const getDueTimeHour = (task: Task): number | null => {
   return isNaN(hour) ? null : hour;
 };
 
-// ─── WeekView ─────────────────────────────────────────────────────────────────
+/** Extract the hour (0-23) from a Google Calendar event start, or null for all-day. */
+const getGcalHour = (ev: GoogleCalendarEvent): number | null => {
+  if (ev.is_all_day) return null;
+  const dt = new Date(ev.start);
+  return isNaN(dt.getTime()) ? null : dt.getHours();
+};
 
-const WeekView: React.FC<WeekViewProps> = ({ currentDate, tasks, onSlotClick, onTaskClick }) => {
+const WeekView: React.FC<WeekViewProps> = ({
+  currentDate,
+  tasks,
+  onSlotClick,
+  onTaskClick,
+  googleEvents = [],
+  onGoogleEventClick,
+}) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const today = new Date();
   const currentHour = today.getHours();
 
-  // 7 dates for the week (Sun–Sat) that contains currentDate.
   const weekDays = useMemo(() => {
     const start = new Date(currentDate);
-    start.setDate(start.getDate() - start.getDay()); // rewind to Sunday
+    start.setDate(start.getDate() - start.getDay());
     start.setHours(0, 0, 0, 0);
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start);
@@ -65,19 +77,15 @@ const WeekView: React.FC<WeekViewProps> = ({ currentDate, tasks, onSlotClick, on
     });
   }, [currentDate]);
 
-  // Group tasks by YYYY-MM-DD key into allDay or an hourly bucket.
   const tasksByDate = useMemo(() => {
     const map: Record<string, { allDay: Task[]; hourly: Record<number, Task[]> }> = {};
-
     tasks.forEach(task => {
       if (!task.due_date) return;
       const key =
         typeof task.due_date === 'string'
           ? task.due_date.slice(0, 10)
           : toDateKey(task.due_date as Date);
-
       if (!map[key]) map[key] = { allDay: [], hourly: {} };
-
       const hour = getDueTimeHour(task);
       if (hour === null) {
         map[key].allDay.push(task);
@@ -86,39 +94,59 @@ const WeekView: React.FC<WeekViewProps> = ({ currentDate, tasks, onSlotClick, on
         map[key].hourly[hour].push(task);
       }
     });
-
     return map;
   }, [tasks]);
 
-  // Auto-scroll to one slot above the current hour on mount.
+  // Build Google event lookup: dateKey → { allDay, hourly }
+  const gcalByDate = useMemo(() => {
+    const map: Record<string, { allDay: GoogleCalendarEvent[]; hourly: Record<number, GoogleCalendarEvent[]> }> = {};
+    googleEvents.forEach(ev => {
+      const key = ev.start.slice(0, 10);
+      if (!map[key]) map[key] = { allDay: [], hourly: {} };
+      const hour = getGcalHour(ev);
+      if (hour === null) {
+        map[key].allDay.push(ev);
+      } else {
+        if (!map[key].hourly[hour]) map[key].hourly[hour] = [];
+        map[key].hourly[hour].push(ev);
+      }
+    });
+    return map;
+  }, [googleEvents]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = Math.max(0, currentHour * SLOT_HEIGHT - SLOT_HEIGHT);
     }
-  // Intentionally run once on mount — scrolling to current hour is an initial orientation,
-  // not a reactive update. Re-running on hour change would fight the user's manual scroll.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentHour]);
 
   return (
-    <div className="border border-gray-100 rounded-lg overflow-hidden select-none">
-
+    <div
+      className="border border-border-subtle rounded-xl overflow-hidden select-none"
+      style={{ backgroundColor: 'var(--tm-surface)' }}
+    >
       {/* ── Day header row ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-[48px_repeat(7,1fr)] bg-gray-50 border-b border-gray-100">
-        <div /> {/* spacer above time-label column */}
+      <div
+        className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border-subtle"
+        style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+      >
+        <div />
         {weekDays.map(day => {
           const isToday = isSameDay(day, today);
           return (
-            <div key={toDateKey(day)} className="py-2 text-center border-l border-gray-100">
-              <div className="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            <div key={toDateKey(day)} className="py-2 text-center border-l border-border-subtle">
+              <div className="text-[10px] sm:text-xs font-semibold text-text-muted uppercase tracking-wide">
                 {DAY_ABBRS[day.getDay()]}
               </div>
               {isToday ? (
-                <span className="w-6 h-6 sm:w-7 sm:h-7 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs sm:text-sm font-bold mx-auto mt-0.5">
+                <span
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold mx-auto mt-0.5"
+                  style={{ backgroundColor: 'var(--tm-accent)', color: 'var(--tm-accent-text)' }}
+                >
                   {day.getDate()}
                 </span>
               ) : (
-                <div className="text-xs sm:text-sm font-medium text-gray-900 mt-0.5">
+                <div className="text-xs sm:text-sm font-medium text-text-primary mt-0.5">
                   {day.getDate()}
                 </div>
               )}
@@ -128,15 +156,19 @@ const WeekView: React.FC<WeekViewProps> = ({ currentDate, tasks, onSlotClick, on
       </div>
 
       {/* ── All-day row ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-gray-200 bg-gray-50">
-        <div className="text-[10px] text-gray-400 flex items-center justify-center leading-tight px-0.5 text-center py-1">
+      <div
+        className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-border"
+        style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+      >
+        <div className="text-[10px] text-text-muted flex items-center justify-center leading-tight px-0.5 text-center py-1">
           all<br />day
         </div>
         {weekDays.map(day => {
-          const key = toDateKey(day);
-          const allDayTasks = tasksByDate[key]?.allDay ?? [];
+          const key          = toDateKey(day);
+          const allDayTasks  = tasksByDate[key]?.allDay  ?? [];
+          const allDayGcal   = gcalByDate[key]?.allDay   ?? [];
           return (
-            <div key={key} className="border-l border-gray-100 p-1 min-h-[32px]">
+            <div key={key} className="border-l border-border-subtle p-1 min-h-[32px]">
               {allDayTasks.map(task => (
                 <div
                   key={task.id}
@@ -148,66 +180,99 @@ const WeekView: React.FC<WeekViewProps> = ({ currentDate, tasks, onSlotClick, on
                   {task.title}
                 </div>
               ))}
+              {allDayGcal.map(ev => (
+                <div
+                  key={ev.id}
+                  onClick={() => onGoogleEventClick?.(ev)}
+                  style={{ backgroundColor: GOOGLE_BLUE }}
+                  className="text-white text-[10px] px-1 py-0.5 rounded truncate font-medium mb-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                  title={ev.title}
+                >
+                  {ev.title}
+                </div>
+              ))}
             </div>
           );
         })}
       </div>
 
       {/* ── Scrollable hourly grid ─────────────────────────────────────────── */}
-      <div ref={scrollRef} className="overflow-y-auto max-h-[520px] sm:max-h-[580px]">
+      <div ref={scrollRef} className="overflow-y-auto max-h-[520px] sm:max-h-[580px] scrollbar-custom">
         {HOURS.map(hour => {
-          const timeLabel = formatTime12Hour(`${String(hour).padStart(2, '0')}:00`);
-          // Highlight current hour row as a global time orientation cue (regardless of week shown).
+          const timeLabel    = formatTime12Hour(`${String(hour).padStart(2, '0')}:00`);
           const isCurrentHour = currentHour === hour;
 
           return (
             <div
               key={hour}
-              className={`grid grid-cols-[48px_repeat(7,1fr)] border-t border-gray-100 ${
-                isCurrentHour ? 'bg-blue-50' : ''
-              }`}
-              style={{ minHeight: `${SLOT_HEIGHT}px` }}
+              className="grid grid-cols-[48px_repeat(7,1fr)] border-t border-border-subtle"
+              style={{
+                minHeight: `${SLOT_HEIGHT}px`,
+                backgroundColor: isCurrentHour ? 'var(--tm-accent-subtle)' : undefined,
+              }}
             >
               {/* Time label */}
-              <div className="text-[10px] text-gray-400 flex items-start justify-end pr-2 pt-1 shrink-0 leading-tight">
+              <div className="text-[10px] text-text-muted flex items-start justify-end pr-2 pt-1 shrink-0 leading-tight">
                 {timeLabel}
               </div>
 
               {/* One slot per day column */}
               {weekDays.map(day => {
-                const key = toDateKey(day);
+                const key       = toDateKey(day);
                 const hourTasks = tasksByDate[key]?.hourly[hour] ?? [];
+                const hourGcal  = gcalByDate[key]?.hourly[hour]  ?? [];
                 const isTodayCol = isSameDay(day, today);
 
                 return (
                   <div
                     key={key}
-                    onClick={() =>
-                      onSlotClick(day, `${String(hour).padStart(2, '0')}:00`)
-                    }
-                    className={`border-l border-gray-100 p-0.5 cursor-pointer transition-colors ${
-                      isTodayCol
+                    onClick={() => onSlotClick(day, `${String(hour).padStart(2, '0')}:00`)}
+                    className="border-l border-border-subtle p-0.5 cursor-pointer transition-colors overflow-hidden relative"
+                    style={{
+                      minHeight: `${SLOT_HEIGHT}px`,
+                      maxHeight: `${SLOT_HEIGHT}px`,
+                      backgroundColor: isTodayCol
                         ? isCurrentHour
-                          ? 'bg-blue-100/60 hover:bg-blue-100'
-                          : 'bg-blue-50/30 hover:bg-blue-50/70'
-                        : 'hover:bg-gray-50'
-                    }`}
-                    style={{ minHeight: `${SLOT_HEIGHT}px` }}
+                          ? 'color-mix(in srgb, var(--tm-accent) 18%, transparent)'
+                          : 'color-mix(in srgb, var(--tm-accent) 6%, transparent)'
+                        : undefined,
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLDivElement).style.backgroundColor =
+                        'color-mix(in srgb, var(--tm-accent) 10%, transparent)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLDivElement).style.backgroundColor = isTodayCol
+                        ? isCurrentHour
+                          ? 'color-mix(in srgb, var(--tm-accent) 18%, transparent)'
+                          : 'color-mix(in srgb, var(--tm-accent) 6%, transparent)'
+                        : '';
+                    }}
                   >
-                    {hourTasks.map(task => (
-                      <div
-                        key={task.id}
-                        onClick={e => {
-                          e.stopPropagation();
-                          onTaskClick(task);
-                        }}
-                        style={{ backgroundColor: getPillColor(task) }}
-                        className="text-white text-[10px] px-1 py-0.5 rounded truncate font-medium mb-0.5 cursor-pointer hover:opacity-80 transition-opacity"
-                        title={task.title}
-                      >
-                        {task.title}
-                      </div>
-                    ))}
+                    <div className="flex flex-col w-full overflow-hidden">
+                      {hourTasks.map(task => (
+                        <div
+                          key={task.id}
+                          onClick={e => { e.stopPropagation(); onTaskClick(task); }}
+                          style={{ backgroundColor: getPillColor(task) }}
+                          className="text-white text-[10px] px-1 py-0.5 rounded truncate font-medium mb-0.5 cursor-pointer hover:opacity-80 transition-opacity block w-full"
+                          title={task.title}
+                        >
+                          {task.title}
+                        </div>
+                      ))}
+                      {hourGcal.map(ev => (
+                        <div
+                          key={ev.id}
+                          onClick={e => { e.stopPropagation(); onGoogleEventClick?.(ev); }}
+                          style={{ backgroundColor: GOOGLE_BLUE }}
+                          className="text-white text-[10px] px-1 py-0.5 rounded truncate font-medium mb-0.5 cursor-pointer hover:opacity-80 transition-opacity block w-full"
+                          title={ev.title}
+                        >
+                          {ev.title}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
