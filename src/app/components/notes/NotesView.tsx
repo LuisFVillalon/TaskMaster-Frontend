@@ -13,13 +13,12 @@ import NoteEditor from './NoteEditor';
 import ResourceSidebar from './ResourceSidebar';
 
 interface NotesViewProps {
-  isDemo?: boolean;
   // When true the component omits its own page chrome (header, bg wrapper)
   // and uses a constrained height suitable for embedding inside TaskManager.
   embedded?: boolean;
 }
 
-const NotesView: React.FC<NotesViewProps> = ({ isDemo = false, embedded = false }) => {
+const NotesView: React.FC<NotesViewProps> = ({ embedded = false }) => {
   const {
     notes,
     filteredNotes,
@@ -32,7 +31,7 @@ const NotesView: React.FC<NotesViewProps> = ({ isDemo = false, embedded = false 
     setSearchTerm,
   } = useNotes();
 
-  const { tags } = useTags(isDemo);
+  const { tags } = useTags();
 
   const searchParams = useSearchParams();
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null);

@@ -33,7 +33,7 @@ export default function NotesPage() {
 
   return (
     <Suspense>
-      <NotesView isDemo={false} />
+      <NotesView />
     </Suspense>
   );
 }

@@ -56,7 +56,7 @@ import { useGoogleCalendar } from '@/app/hooks/useGoogleCalendar';
 import GoogleEventModal from '@/app/components/calendar/GoogleEventModal';
 import { GoogleCalendarEvent } from '@/app/types/calendar';
 
-const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
+const TaskManager: React.FC = () => {
   const router = useRouter();
   const { signOut, user } = useAuth();
 
@@ -101,9 +101,9 @@ const TaskManager: React.FC<{ isDemo: boolean }> = ({ isDemo }) => {
     //    in-memory state (BriefingCard, ResourceSidebar, task list, etc.).
     router.replace('/login');
   };
-  const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks, sendTaskToAI, addTasks } = useTasks(isDemo);
+  const { tasks, isLoading, toggleComplete, addTask, deleteTask, updateTask, setTasks, sendTaskToAI, addTasks } = useTasks();
 
-  const { tags, tagsLoading, addTag, delTag, updateTag } = useTags(isDemo);
+  const { tags, tagsLoading, addTag, delTag, updateTag } = useTags();
 
   const [showSettings, setShowSettings] = useState(false);
   const [activeGoogleEvent, setActiveGoogleEvent] = useState<GoogleCalendarEvent | null>(null);

@@ -40,5 +40,5 @@ export default function Page() {
   }
 
   // Authenticated — render the app.
-  return <TaskManager isDemo={false} />;
+  return <TaskManager />;
 }
