@@ -41,7 +41,7 @@ export const useTasks = (demo: boolean = false) => {
       // Load sample data for demo
       const sampleTasks: Task[] = [
         {
-          user_id: 98,
+          user_id: "demo",
           id: 3,
           title: "Prepare for midterm exam",
           description: "Study algorithms and data structures for the upcoming midterm",
@@ -55,7 +55,7 @@ export const useTasks = (demo: boolean = false) => {
           completed_date: null
         },
         {
-          user_id: 98,
+          user_id: "demo",
           id: 4,
           title: "Update resume",
           description: "Add recent projects and skills to the resume",
@@ -69,7 +69,7 @@ export const useTasks = (demo: boolean = false) => {
           completed_date: null
         },
         {
-          user_id: 98,
+          user_id: "demo",
           id: 5,
           title: "Chillax",
           description: "Relax for a while, enjoy yourself",
@@ -150,7 +150,7 @@ export const useTasks = (demo: boolean = false) => {
   const addTask = async (newTask: BaseTaskForm) => {
     if (demo) {
       const createdTask: Task = {
-        user_id: 98,
+        user_id: "demo",
         id: Math.max(0, ...tasks.map(t => t.id)) + 1,
         title: newTask.title,
         description: newTask.description,
@@ -207,7 +207,7 @@ export const useTasks = (demo: boolean = false) => {
     try {
 const normalizedTask = {
   ...newAITask,
-  user_id: 0,
+  user_id: null,
   completed: false,
   due_date: newAITask.due_date instanceof Date
     ? newAITask.due_date.toISOString().slice(0, 10)
