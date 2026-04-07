@@ -118,7 +118,6 @@ export const getDueColor = (dueDate?: string | Date | null) => {
   const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) return "text-red-700 bg-red-50";
-  if (diffDays <= 1) return "text-yellow-700 bg-yellow-50";
   if (diffDays <= 3) return "text-yellow-700 bg-yellow-50";
   return "text-green-700 bg-green-50";
 };

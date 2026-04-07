@@ -1,5 +1,5 @@
 /*
-Purpose: This component handles password-based authentication for the application, 
+Purpose: This component handles password-based authentication for the application,
 validating the entered password against an environment variable and managing the login flow.
 
 Variables Summary:
@@ -64,9 +64,9 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-blue-200">
+    <div className="min-h-screen flex items-center justify-center bg-bg p-4">
+      <div className="max-w-md w-full animate-slide-up">
+        <div className="card p-8">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center">
               <Image
@@ -76,13 +76,13 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
                 height={120}
               />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">TaskMaster</h1>
-            <p className="text-gray-600">Type “recruiter” to try the demo</p>
+            <h1 className="text-2xl font-bold text-text-primary mb-2">TaskMaster</h1>
+            <p className="text-text-secondary text-sm">Type &quot;recruiter&quot; to try the demo</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-text-secondary mb-2">
                 Password
               </label>
               <div className="relative">
@@ -91,7 +91,7 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
                   id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900"
+                  className="input-field pr-12"
                   placeholder="Enter password"
                   required
                   autoFocus
@@ -99,7 +99,8 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-muted hover:text-text-secondary transition-colors focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -111,7 +112,8 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
             </div>
 
             {error && (
-              <div className="text-red-600 text-sm text-center bg-red-50 p-3 rounded-lg">
+              <div className="text-sm text-center px-3 py-2.5 rounded-xl"
+                style={{ color: 'var(--tm-danger)', backgroundColor: 'var(--tm-danger-subtle)' }}>
                 {error}
               </div>
             )}
@@ -119,20 +121,20 @@ const PasswordAuth: React.FC<PasswordAuthProps> = ({ onAuthenticated }) => {
             <button
               type="submit"
               disabled={isLoading || !password.trim()}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="btn btn-primary w-full py-3 text-base"
             >
               {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Verifying...
-                </div>
+                <>
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Verifying…
+                </>
               ) : (
                 'Continue'
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-gray-500">
+          <div className="mt-6 text-center text-xs text-text-muted">
             Luis Villalón © 2026
           </div>
         </div>

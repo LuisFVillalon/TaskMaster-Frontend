@@ -22,8 +22,6 @@ These types define the structure of all data used in the application.
 export interface EditTaskModalState {
   status: boolean;
   task: Task | null;
-  estimated_time?: number | null;
-  complexity?: number | null;
 };
 
 export interface Tag {
@@ -51,7 +49,8 @@ export interface Task {
   estimated_time?: number | null;
   complexity?: number | null;
   parent_task_id?: number | null;
-  user_id: number;
+  /** Supabase Auth UUID — set server-side, never supplied by the client. */
+  user_id?: string | null;
 }
 
 export interface BaseTaskForm {
@@ -78,7 +77,6 @@ export interface EditTaskForm extends BaseTaskForm {
   completed_date: string | Date | null;
 }
 
-// export interface NewTag extends Omit<Tag, 'id'> {}
 export type NewTag = Omit<Tag, "id">;
 
 export interface TagStats {

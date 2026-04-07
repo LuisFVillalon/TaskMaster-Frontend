@@ -24,19 +24,14 @@ import {
     sendNewTaskToAIAPI
 } from "@/app/lib/ai-api";
 import { Task, Tag, BaseTaskForm, EditTaskForm, NewTag } from '@/app/types/task';
-// Helper function to format date in local timezone (not UTC)
-const getLocalISOString = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  const ms = String(date.getMilliseconds()).padStart(3, '0');
-  
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
-};
+import { toLocalISOString } from '@/app/utils/dateUtils';
 
+/**
+ * Manages task state and CRUD operations.
+ *
+ * @param demo - When true, pre-loads sample data and skips all API calls.
+ *               Used by the public landing-page demo.
+ */
 export const useTasks = (demo: boolean = false) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,7 +108,7 @@ export const useTasks = (demo: boolean = false) => {
     if (!task) return;
     
     const newCompleted = !task.completed;
-    const newCompletedDate = newCompleted ? getLocalISOString(new Date()) : null;
+    const newCompletedDate = newCompleted ? toLocalISOString(new Date()) : null;
 
     setTasks(prev =>
       prev.map(t =>
@@ -139,7 +134,7 @@ export const useTasks = (demo: boolean = false) => {
         due_time: task.due_time ? (task.due_time instanceof Date ? task.due_time.toISOString().slice(11, 16) : task.due_time) : '',
         tags: task.tags.map(tag => ({ id: tag.id, name: tag.name, color: tag.color })),
         category: task.category ?? null,
-        created_date: task.created_date instanceof Date ? getLocalISOString(task.created_date) : (typeof task.created_date === 'string' ? task.created_date : null),
+        created_date: task.created_date instanceof Date ? toLocalISOString(task.created_date) : (typeof task.created_date === 'string' ? task.created_date : null),
         completed_date: newCompletedDate
       });
     } catch (err) {
@@ -165,7 +160,7 @@ export const useTasks = (demo: boolean = false) => {
         due_time: newTask.due_time,
         tags: newTask.tags || [],
         category: newTask.category ?? null,
-        created_date: getLocalISOString(new Date()),
+        created_date: toLocalISOString(new Date()),
         completed_date: null
       };
       setTasks([createdTask, ...tasks]);
@@ -180,7 +175,7 @@ export const useTasks = (demo: boolean = false) => {
           due_time: newTask.due_time instanceof Date
             ? newTask.due_time.toISOString().slice(11, 16)
             : (newTask.due_time ?? undefined),
-          created_date: getLocalISOString(new Date()),
+          created_date: toLocalISOString(new Date()),
           completed_date: null,
           completed: false
         };
@@ -222,7 +217,7 @@ const normalizedTask = {
     : (newAITask.due_time ?? ''),
   category: newAITask.category ?? undefined,
   created_date: newAITask.created_date instanceof Date
-    ? getLocalISOString(newAITask.created_date)
+    ? toLocalISOString(newAITask.created_date)
     : (newAITask.created_date ?? ''),
   completed_date: null,
   estimated_time: newAITask.estimated_time ?? 0,
@@ -245,16 +240,24 @@ const normalizedTask = {
       setTasks(prev => prev.filter(task => task.id !== delTask.id));
       return true;
     }
+
+    // Optimistic update: remove immediately so the UI responds instantly.
+    setTasks(prev => prev.filter(task => task.id !== delTask.id));
+
     try {
-        await onDelete(delTask.id);
-        setTasks(prev =>
-            prev.filter(task => task.id !== delTask.id)
-        );
-        return true;
+      await onDelete(delTask.id);
+      return true;
     } catch (err) {
-        console.error('Delete failed:', err);
-        alert("Failed to delete task");
-        return false;
+      // Rollback: restore the task at its original position.
+      console.error('Delete failed:', err);
+      setTasks(prev => {
+        // Re-insert in sorted order by id to preserve list order.
+        const next = [...prev, delTask];
+        next.sort((a, b) => b.id - a.id);
+        return next;
+      });
+      alert("Couldn't delete the task — it has been restored.");
+      return false;
     }
   };
 
@@ -309,6 +312,12 @@ const normalizedTask = {
   };
 };
 
+/**
+ * Manages tag state and CRUD operations.
+ *
+ * @param demo - When true, pre-loads sample tags and skips all API calls.
+ *               Used by the public landing-page demo.
+ */
 export const useTags = (demo: boolean = false) => {
   const [tags, setTags] = useState<Tag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(true);
@@ -377,7 +386,6 @@ export const useTags = (demo: boolean = false) => {
       return delTag.id;
     }
     try {
-        console.log(delTag)
         await onDeleteTag(delTag.id);
         setTags(prev =>
             prev.filter(task => task.id !== delTag.id)

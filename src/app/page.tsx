@@ -1,48 +1,44 @@
-/*
-Purpose: This file contains the main page component for the application, responsible for 
-handling user authentication and conditionally rendering the TaskManager or PasswordAuth component.
-
-Variables Summary:
-- isAuthenticated: Boolean state indicating if the user has been authenticated, checked from localStorage.
-- isDemo: Boolean state indicating if the user is in demo mode.
-- isLoading: Boolean state for the initial loading phase while checking authentication.
-- handleAuthenticated: Function that sets isAuthenticated and isDemo when login succeeds.
-
-These variables manage the authentication flow, showing a loading spinner initially, the auth form if not authenticated, or the main TaskManager if authenticated.
-*/
-
 'use client';
 
-import React, { useState } from 'react';
-import TaskManager from "./TaskManager";
-import PasswordAuth from "./components/PasswordAuth";
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from './context/AuthContext';
+import TaskManager from './TaskManager';
 
-// Home page, asks user for a password to access the web application. 
-// isLoading is the loading status
-// isAuthenticated dictates if the user can access the web app
-// isDemo indicates demo mode
-
+/**
+ * Root page — protected route.
+ *
+ * While the Supabase session is being restored from storage we render a
+ * full-screen spinner so there is no flash of the login page for returning
+ * users. Once the session is known:
+ *   - Authenticated → render TaskManager
+ *   - Unauthenticated → redirect to /login
+ */
 export default function Page() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('taskmaster_authenticated') === 'true';
-  });
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-  const [isDemo, setIsDemo] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('taskmaster_demo') === 'true';
-  });
-
-  const handleAuthenticated = (demo: boolean) => {
-    localStorage.setItem('taskmaster_authenticated', 'true');
-    localStorage.setItem('taskmaster_demo', demo.toString());
-    setIsAuthenticated(true);
-    setIsDemo(demo);
-  };
-
-  if (!isAuthenticated) {
-    return <PasswordAuth onAuthenticated={handleAuthenticated} />;
+  // Session still loading from localStorage — show a neutral spinner.
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: 'var(--tm-bg)' }}
+      >
+        <div
+          className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
+          style={{ borderColor: 'var(--tm-accent)', borderTopColor: 'transparent' }}
+        />
+      </div>
+    );
   }
 
-  return <TaskManager isDemo={isDemo} />;
+  // Not authenticated — redirect to login.
+  if (!user) {
+    router.replace('/login');
+    return null;
+  }
+
+  // Authenticated — render the app.
+  return <TaskManager isDemo={false} />;
 }
