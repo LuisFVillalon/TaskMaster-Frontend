@@ -35,19 +35,33 @@ interface AuthContextValue {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Returns the canonical base URL for OAuth redirect URIs.
+ * Returns the canonical base URL for OAuth redirect URIs, always with a
+ * trailing slash so callers can safely append path segments.
  *
  * Resolution order:
- *  1. NEXT_PUBLIC_SITE_URL  — explicit production URL set in Vercel env vars.
- *     Use this to lock the redirect to your canonical domain regardless of
- *     which URL the user happens to be visiting (e.g. a Vercel preview URL).
- *  2. window.location.origin — correct for localhost in development and for
- *     Vercel preview deploys when no canonical URL is configured.
+ *  1. NEXT_PUBLIC_SITE_URL       — explicit canonical URL set in Vercel env
+ *                                   vars (e.g. https://task-master-mvp.vercel.app).
+ *                                   Set this once in Vercel → Settings → Environment
+ *                                   Variables for the Production environment.
+ *  2. NEXT_PUBLIC_VERCEL_URL     — automatically injected by Vercel for every
+ *                                   deployment. Does NOT include the protocol,
+ *                                   so we prepend https://.
+ *  3. window.location.origin     — correct for localhost in development and
+ *                                   for any other environment not covered above.
  */
-function getRedirectBase(): string {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (siteUrl) return siteUrl.replace(/\/$/, '');
-  return window.location.origin;
+function getURL(): string {
+  let url: string =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.NEXT_PUBLIC_VERCEL_URL ??
+    window.location.origin;
+
+  // NEXT_PUBLIC_VERCEL_URL is protocol-less (e.g. "abc-123.vercel.app").
+  if (!url.includes('http')) url = `https://${url}`;
+
+  // Normalise to always have a trailing slash.
+  if (!url.endsWith('/')) url = `${url}/`;
+
+  return url;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -90,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Supabase embeds this URL in the confirmation email.
           // Without it the dashboard's "Site URL" is used, which may point to
           // production even when running locally.
-          emailRedirectTo: `${getRedirectBase()}/auth/callback`,
+          emailRedirectTo: `${getURL()}auth/callback`,
         },
       });
       return { error };
@@ -110,9 +124,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // After Google redirects back, Supabase will handle the token exchange
-        // and then redirect to this URL.
-        redirectTo: `${getRedirectBase()}/auth/callback`,
+        // After Google redirects back, Supabase handles the token exchange
+        // and then forwards the user to this URL.
+        redirectTo: `${getURL()}auth/callback`,
+        queryParams: {
+          // Request a refresh token so the session survives page reloads.
+          // 'consent' forces the Google screen to always appear — this is
+          // what produces a clean PKCE ?code= redirect instead of the
+          // implicit #access_token= hash that can confuse the callback page.
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
     return { error };
