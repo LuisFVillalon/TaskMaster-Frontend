@@ -310,7 +310,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       `;
 
       await new Promise<void>(resolve =>
-        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       );
 
       const pdfRoot = container.querySelector('.pdf-root') as HTMLElement | null;
