@@ -16,11 +16,11 @@
  * provider from the JWT payload and returns 403 for OAuth accounts.
  */
 
-import React, { useState, useMemo } from 'react';
-import { X, Loader2, Eye, EyeOff, AlertTriangle, ExternalLink, ShieldCheck, Calendar, CheckCircle2, WifiOff } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { X, Loader2, Eye, EyeOff, AlertTriangle, ExternalLink, ShieldCheck, Calendar, CheckCircle2, WifiOff, Clock, Trash2, Plus } from 'lucide-react';
 import { supabase } from '@/app/lib/supabase';
 import { useAuth } from '@/app/context/AuthContext';
-import { updatePassword, deleteAccount } from '@/app/lib/backend-api';
+import { updatePassword, deleteAccount, fetchAvailabilityPreferences, createAvailabilityPreference, deleteAvailabilityPreference, type AvailabilityPreference } from '@/app/lib/backend-api';
 import { validatePassword, MIN_LENGTH } from '@/app/lib/passwordValidation';
 import PasswordStrengthMeter from '@/app/components/PasswordStrengthMeter';
 import { type GCalStatus } from '@/app/hooks/useGoogleCalendar';
@@ -37,7 +37,13 @@ interface Props {
   gcalError?: string | null;
 }
 
-type Section = 'password' | 'email' | 'gcal' | 'delete';
+type Section = 'password' | 'email' | 'gcal' | 'availability' | 'delete';
+
+const DAY_NAMES  = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+const DAY_ABBRS  = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'] as const;
+
+/** True when the end-time string is earlier than the start-time string (overnight window). */
+const isOvernight = (start: string, end: string) => end < start;
 
 // Providers that use a federated identity — they have no local password.
 const OAUTH_PROVIDERS = new Set(['google', 'github', 'facebook', 'twitter', 'apple']);
@@ -125,6 +131,89 @@ export default function SettingsModal({
     try { await onGcalDisconnect(); } finally { setGcalDisconnecting(false); }
   };
 
+  // ── Availability Preferences ─────────────────────────────────────────────
+  const [prefs, setPrefs]           = useState<AvailabilityPreference[]>([]);
+  const [prefsLoading, setPrefsLoading] = useState(false);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+
+  // New-entry form
+  const [newLabel,   setNewLabel]   = useState('');
+  const [newDows,    setNewDows]    = useState<Set<number>>(new Set([1])); // Monday default
+  const [newStart,   setNewStart]   = useState('09:00');
+  const [newEnd,     setNewEnd]     = useState('10:00');
+  const [addingPref, setAddingPref] = useState(false);
+  const [addError,   setAddError]   = useState<string | null>(null);
+
+  const toggleDow = (d: number) =>
+    setNewDows(prev => {
+      const next = new Set(prev);
+      next.has(d) ? next.delete(d) : next.add(d);
+      return next;
+    });
+
+  useEffect(() => {
+    if (section !== 'availability' || prefs.length > 0) return;
+    setPrefsLoading(true);
+    fetchAvailabilityPreferences()
+      .then(setPrefs)
+      .catch(() => setPrefsError('Failed to load preferences.'))
+      .finally(() => setPrefsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section]);
+
+  const handleAddPref = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError(null);
+    if (newDows.size === 0) { setAddError('Select at least one day.'); return; }
+    if (newStart === newEnd)  { setAddError('Start and end time cannot be the same.'); return; }
+    setAddingPref(true);
+    try {
+      // Create one backend entry per selected day (sequential — keeps order deterministic).
+      const created: AvailabilityPreference[] = [];
+      for (const dow of Array.from(newDows).sort((a, b) => a - b)) {
+        const pref = await createAvailabilityPreference({
+          day_of_week: dow,
+          start_time:  newStart,
+          end_time:    newEnd,
+          label:       newLabel.trim() || null,
+        });
+        created.push(pref);
+      }
+      setPrefs(prev =>
+        [...prev, ...created].sort((a, b) =>
+          a.day_of_week !== b.day_of_week
+            ? a.day_of_week - b.day_of_week
+            : a.start_time.localeCompare(b.start_time),
+        ),
+      );
+      setNewLabel('');
+      setNewDows(new Set([1]));
+      setNewStart('09:00');
+      setNewEnd('10:00');
+    } catch {
+      setAddError('Failed to save. Please try again.');
+    } finally {
+      setAddingPref(false);
+    }
+  };
+
+  const handleDeletePref = async (id: number) => {
+    try {
+      await deleteAvailabilityPreference(id);
+      setPrefs(prev => prev.filter(p => p.id !== id));
+    } catch {
+      setPrefsError('Failed to delete. Please try again.');
+    }
+  };
+
+  // Formatted time label: "09:00" → "9:00 AM"
+  const fmt12 = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    const period = h < 12 ? 'AM' : 'PM';
+    const h12    = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+  };
+
   // ── Delete Account ───────────────────────────────────────────────────────
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleteStatus, setDeleteStatus]           = useState<'idle' | 'deleting' | 'error'>('idle');
@@ -149,7 +238,7 @@ export default function SettingsModal({
   const tabStyle = (s: Section): React.CSSProperties => {
     if (section !== s) return {};
     if (s === 'delete') return { backgroundColor: 'var(--tm-danger)' };
-    if (s === 'gcal') return { backgroundColor: GOOGLE_BLUE };
+    if (s === 'gcal')   return { backgroundColor: GOOGLE_BLUE };
     return { backgroundColor: 'var(--tm-accent)' };
   };
 
@@ -165,7 +254,7 @@ export default function SettingsModal({
   return (
     <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="modal-panel w-full max-w-md rounded-2xl shadow-xl"
+        className="modal-panel w-full max-w-lg rounded-2xl shadow-xl"
         style={{ backgroundColor: 'var(--tm-surface)', border: '1px solid var(--tm-border)' }}
       >
         {/* ── Header ───────────────────────────────────────────────────────── */}
@@ -196,7 +285,7 @@ export default function SettingsModal({
 
         {/* ── Tab Bar ──────────────────────────────────────────────────────── */}
         <div
-          className="flex gap-1 px-6 py-3 border-b"
+          className="flex gap-1 px-6 py-3 border-b overflow-x-auto scrollbar-custom"
           style={{ borderColor: 'var(--tm-border)', backgroundColor: 'var(--tm-surface-raised)' }}
         >
           <button
@@ -220,6 +309,13 @@ export default function SettingsModal({
             style={tabStyle('gcal')}
           >
             Google Cal
+          </button>
+          <button
+            onClick={() => setSection('availability')}
+            className={tabClass('availability')}
+            style={tabStyle('availability')}
+          >
+            Availability
           </button>
           <button
             onClick={() => setSection('delete')}
@@ -436,6 +532,183 @@ export default function SettingsModal({
               <p className="text-xs text-center" style={{ color: 'var(--tm-text-muted)' }}>
                 Read-only access. Your tasks are never written to Google Calendar.
               </p>
+            </div>
+          )}
+
+          {/* ── Availability Tab ─────────────────────────────────────────── */}
+          {section === 'availability' && (
+            <div className="space-y-4">
+              {/* Explainer */}
+              <div
+                className="flex gap-3 p-3 rounded-xl text-sm"
+                style={{ backgroundColor: 'var(--tm-surface-raised)', border: '1px solid var(--tm-border)' }}
+              >
+                <Clock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--tm-accent)' }} />
+                <p style={{ color: 'var(--tm-text-secondary)' }}>
+                  Blackout windows are recurring weekly times the AI will <strong>never</strong> schedule
+                  work blocks — gym, class, family time. Supports overnight spans (e.g. 10 PM – 8 AM).
+                  Times are in UTC.
+                </p>
+              </div>
+
+              {/* Existing preference list */}
+              {prefsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--tm-accent)' }} />
+                </div>
+              ) : prefs.length === 0 ? (
+                <p className="text-sm text-center py-2" style={{ color: 'var(--tm-text-muted)' }}>
+                  No blackout windows yet. Add one below.
+                </p>
+              ) : (
+                <ul className="space-y-2 max-h-44 overflow-y-auto scrollbar-custom pr-1">
+                  {prefs.map(p => {
+                    const overnight = isOvernight(p.start_time, p.end_time);
+                    return (
+                      <li
+                        key={p.id}
+                        className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm"
+                        style={{ backgroundColor: 'var(--tm-surface-raised)', border: '1px solid var(--tm-border)' }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-text-primary">
+                            {p.label || 'Unavailable'}
+                          </span>
+                          <span className="text-text-muted mx-1.5">·</span>
+                          <span style={{ color: 'var(--tm-text-secondary)' }}>
+                            {DAY_NAMES[p.day_of_week]}s {fmt12(p.start_time)} – {fmt12(p.end_time)}
+                            {overnight && (
+                              <span
+                                className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: 'var(--tm-accent-subtle)', color: 'var(--tm-accent)' }}
+                              >
+                                next day
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleDeletePref(p.id)}
+                          className="btn btn-danger-ghost p-1 shrink-0"
+                          aria-label="Delete blackout window"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {prefsError && (
+                <p className="text-sm" style={{ color: 'var(--tm-danger)' }}>{prefsError}</p>
+              )}
+
+              {/* Add new preference form */}
+              <form
+                onSubmit={handleAddPref}
+                className="space-y-3 pt-3 border-t"
+                style={{ borderColor: 'var(--tm-border)' }}
+              >
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">
+                  Add Blackout Window
+                </p>
+
+                {/* Label */}
+                <div>
+                  <label className="block text-xs font-medium text-text-muted mb-1">Label (optional)</label>
+                  <input
+                    type="text"
+                    value={newLabel}
+                    onChange={e => setNewLabel(e.target.value)}
+                    placeholder="e.g. Gym, Class, Family time"
+                    maxLength={60}
+                    className="input-field w-full text-sm"
+                  />
+                </div>
+
+                {/* Day-of-week toggle chips */}
+                <div>
+                  <label className="block text-xs font-medium text-text-muted mb-2">Days</label>
+                  <div className="flex gap-1.5">
+                    {DAY_ABBRS.map((abbr, i) => {
+                      const active = newDows.has(i);
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => toggleDow(i)}
+                          aria-pressed={active}
+                          title={DAY_NAMES[i]}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
+                          style={active ? {
+                            backgroundColor: 'var(--tm-accent)',
+                            color: 'var(--tm-accent-text, #fff)',
+                          } : {
+                            backgroundColor: 'var(--tm-surface-raised)',
+                            color: 'var(--tm-text-muted)',
+                            border: '1px solid var(--tm-border)',
+                          }}
+                        >
+                          {abbr}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Time range */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-text-muted mb-1">Start (UTC)</label>
+                    <input
+                      type="time"
+                      value={newStart}
+                      onChange={e => setNewStart(e.target.value)}
+                      required
+                      className="input-field w-full text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-text-muted mb-1">End (UTC)</label>
+                    <input
+                      type="time"
+                      value={newEnd}
+                      onChange={e => setNewEnd(e.target.value)}
+                      required
+                      className="input-field w-full text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Overnight hint */}
+                {isOvernight(newStart, newEnd) && (
+                  <p className="text-xs flex items-center gap-1.5" style={{ color: 'var(--tm-accent)' }}>
+                    <Clock className="w-3 h-3 shrink-0" />
+                    Spans midnight — ends the following morning.
+                  </p>
+                )}
+
+                {addError && (
+                  <p className="text-sm" style={{ color: 'var(--tm-danger)' }}>{addError}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={addingPref || newDows.size === 0}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
+                  style={{ backgroundColor: 'var(--tm-accent)' }}
+                >
+                  {addingPref
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Plus className="w-4 h-4" />
+                  }
+                  {newDows.size > 1
+                    ? `Add to ${newDows.size} days`
+                    : 'Add Blackout Window'
+                  }
+                </button>
+              </form>
             </div>
           )}
 

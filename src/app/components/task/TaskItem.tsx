@@ -13,9 +13,9 @@ Variables Summary:
 These variables are used to display task information and handle user interactions like completion toggle, edit, and delete.
 */
 
-import React from 'react';
-import { Check, Clock, AlertCircle, Trash2, Pencil, BarChart3, Calendar } from 'lucide-react';
-import { Task } from '@/app/types/task';
+import React, { useState } from 'react';
+import { Check, Clock, AlertCircle, Trash2, Pencil, BarChart3, Calendar, CalendarClock, Loader2 } from 'lucide-react';
+import { Task, WorkBlock } from '@/app/types/task';
 import { getDueColor, getDurationColor, getComplexityColor, formatTime12Hour, formatDueDate } from '@/app/utils/taskUtils';
 
 interface TaskItemProps {
@@ -25,14 +25,35 @@ interface TaskItemProps {
   tags: Array<{ id: number; name: string; color: string }>;
   onDeleteTask?: (task: Task) => void;
   onEditTaskClick?: (params: { status: boolean; task: Task }) => void;
+  /** Called when the user clicks "Find Best Time". Parent handles the API call and returns the created WorkBlock. */
+  onScheduleTask?: (task: Task) => Promise<WorkBlock>;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags, onDeleteTask, onEditTaskClick }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags, onDeleteTask, onEditTaskClick, onScheduleTask }) => {
   const handleDeleteTask = (taskToDelete: Task) => {
     onDeleteTask?.(taskToDelete);
   };
   const handleEditTask = ({ status, taskToEdit }: { status: boolean; taskToEdit: Task }) => {
     onEditTaskClick?.({ status, task: taskToEdit });
+  };
+
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduledBlock, setScheduledBlock] = useState<WorkBlock | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+
+  const handleScheduleClick = async () => {
+    if (!onScheduleTask) return;
+    setScheduling(true);
+    setScheduleError(null);
+    setScheduledBlock(null);
+    try {
+      const block = await onScheduleTask(task);
+      setScheduledBlock(block);
+    } catch (e) {
+      setScheduleError(e instanceof Error ? e.message : 'Scheduling failed');
+    } finally {
+      setScheduling(false);
+    }
   };
 
   const normalizedDueDate: string | null =
@@ -191,6 +212,36 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
               </div>
 
             </div>
+
+            {/* Smart Scheduling row */}
+            {!task.completed && task.due_date && onScheduleTask && (
+              <div className="mt-3 pt-3 border-t border-border-subtle flex items-center flex-wrap gap-2">
+                <button
+                  onClick={handleScheduleClick}
+                  disabled={scheduling}
+                  className="btn btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-60"
+                >
+                  {scheduling
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <CalendarClock className="w-3 h-3" />
+                  }
+                  {scheduling ? 'Finding best time…' : 'Find Best Time'}
+                </button>
+                {scheduledBlock && !scheduleError && (
+                  <span className="text-xs text-text-secondary">
+                    Scheduled {new Date(scheduledBlock.start_time).toLocaleString([], {
+                      weekday: 'short', month: 'short', day: 'numeric',
+                      hour: '2-digit', minute: '2-digit',
+                    })} — check calendar
+                  </span>
+                )}
+                {scheduleError && (
+                  <span className="text-xs" style={{ color: 'var(--tm-danger)' }}>
+                    {scheduleError}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

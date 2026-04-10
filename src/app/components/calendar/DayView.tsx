@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useRef, useEffect } from 'react';
-import { Task } from '@/app/types/task';
+import { Task, WorkBlock } from '@/app/types/task';
 import { GoogleCalendarEvent } from '@/app/types/calendar';
 import { formatTime12Hour } from '@/app/utils/taskUtils';
 
@@ -15,6 +15,8 @@ const DAY_NAMES = [
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const SLOT_HEIGHT = 72; // px — taller than WeekView for richer task detail
 const GOOGLE_BLUE = '#1a73e8';
+const WORK_BLOCK_SUGGESTED = '#7c3aed';
+const WORK_BLOCK_CONFIRMED  = '#059669';
 
 interface DayViewProps {
   currentDate: Date;
@@ -23,6 +25,8 @@ interface DayViewProps {
   onTaskClick: (task: Task) => void;
   googleEvents?: GoogleCalendarEvent[];
   onGoogleEventClick?: (event: GoogleCalendarEvent) => void;
+  workBlocks?: WorkBlock[];
+  onWorkBlockAction?: (id: number, status: 'confirmed' | 'dismissed') => void;
 }
 
 const toDateKey = (date: Date): string =>
@@ -66,6 +70,8 @@ const DayView: React.FC<DayViewProps> = ({
   onTaskClick,
   googleEvents = [],
   onGoogleEventClick,
+  workBlocks = [],
+  onWorkBlockAction,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const today = new Date();
@@ -113,6 +119,24 @@ const DayView: React.FC<DayViewProps> = ({
     });
     return { allDay, hourly };
   }, [currentDate, googleEvents]);
+
+  const workBlocksForDay = useMemo(() => {
+    const dateKey = toDateKey(currentDate);
+    const hourly: Record<number, WorkBlock[]> = {};
+    workBlocks.forEach(wb => {
+      if (wb.start_time.slice(0, 10) !== dateKey) return;
+      const hour = new Date(wb.start_time).getHours();
+      if (!hourly[hour]) hourly[hour] = [];
+      hourly[hour].push(wb);
+    });
+    return hourly;
+  }, [currentDate, workBlocks]);
+
+  const taskMap = useMemo(() => {
+    const m: Record<number, string> = {};
+    tasks.forEach(t => { m[t.id] = t.title; });
+    return m;
+  }, [tasks]);
 
   // Auto-scroll to current hour on mount.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,8 +217,9 @@ const DayView: React.FC<DayViewProps> = ({
       {/* ── Scrollable hourly slots ────────────────────────────────────────── */}
       <div ref={scrollRef} className="overflow-y-auto max-h-[520px] sm:max-h-[580px] scrollbar-custom">
         {HOURS.map(hour => {
-          const hourTasks = dayTasks.hourly[hour] ?? [];
-          const hourGcal  = gcalForDay.hourly[hour]  ?? [];
+          const hourTasks   = dayTasks.hourly[hour]        ?? [];
+          const hourGcal    = gcalForDay.hourly[hour]       ?? [];
+          const hourBlocks  = workBlocksForDay[hour]        ?? [];
           const isCurrentHour = isToday && currentHour === hour;
           const timeLabel = formatTime12Hour(`${String(hour).padStart(2, '0')}:00`);
 
@@ -275,6 +300,46 @@ const DayView: React.FC<DayViewProps> = ({
                     </div>
                   </div>
                 ))}
+                {hourBlocks.map(wb => {
+                  const color = wb.status === 'confirmed' ? WORK_BLOCK_CONFIRMED : WORK_BLOCK_SUGGESTED;
+                  const title = taskMap[wb.task_id] ?? 'AI Work Block';
+                  const endLabel = new Date(wb.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div
+                      key={wb.id}
+                      onClick={e => e.stopPropagation()}
+                      style={{ border: `2px ${wb.status === 'confirmed' ? 'solid' : 'dashed'} ${color}`, color }}
+                      className="rounded-xl px-3 py-2"
+                      title={wb.ai_reasoning}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs sm:text-sm font-semibold leading-tight truncate">{title}</div>
+                          <div className="text-[10px] mt-0.5 opacity-75">
+                            {wb.status === 'suggested' ? 'AI Suggested' : 'Confirmed'} · until {endLabel}
+                          </div>
+                          <div className="text-[10px] mt-0.5 opacity-60 line-clamp-1">{wb.ai_reasoning}</div>
+                        </div>
+                        {wb.status === 'suggested' && onWorkBlockAction && (
+                          <div className="flex gap-1.5 shrink-0 mt-0.5">
+                            <button
+                              onClick={e => { e.stopPropagation(); onWorkBlockAction(wb.id, 'confirmed'); }}
+                              title="Confirm this time slot"
+                              className="text-xs font-bold hover:opacity-70 border rounded px-1.5 py-0.5"
+                              style={{ borderColor: color }}
+                            >✓</button>
+                            <button
+                              onClick={e => { e.stopPropagation(); onWorkBlockAction(wb.id, 'dismissed'); }}
+                              title="Dismiss this suggestion"
+                              className="text-xs font-bold hover:opacity-70 border rounded px-1.5 py-0.5"
+                              style={{ borderColor: color }}
+                            >✕</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

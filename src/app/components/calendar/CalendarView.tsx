@@ -2,7 +2,7 @@
 
 import React, { useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import { Task } from '@/app/types/task';
+import { Task, WorkBlock } from '@/app/types/task';
 import { GoogleCalendarEvent } from '@/app/types/calendar';
 import { useCalendarState } from '@/app/hooks/useCalendarState';
 import MonthView from './MonthView';
@@ -39,6 +39,10 @@ interface CalendarViewProps {
    * Only called when Google Calendar is connected (non-null handler).
    */
   onSync?: (timeMin: string, timeMax: string) => void;
+  /** AI-scheduled work blocks to overlay on the calendar. */
+  workBlocks?: WorkBlock[];
+  /** Called when the user accepts or dismisses a suggested work block. */
+  onWorkBlockAction?: (id: number, status: 'confirmed' | 'dismissed') => void;
 }
 
 // Compute the ISO 8601 time range that should be fetched for the current view.
@@ -90,6 +94,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   onGoogleEventClick,
   googleSyncing = false,
   onSync,
+  workBlocks = [],
+  onWorkBlockAction,
 }) => {
   const { view, setView, currentDate, goToPrev, goToNext, goToToday } = useCalendarState();
 
@@ -197,6 +203,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           onTaskClick={onTaskClick}
           googleEvents={googleEvents}
           onGoogleEventClick={onGoogleEventClick}
+          workBlocks={workBlocks}
+          onWorkBlockAction={onWorkBlockAction}
         />
       )}
       {view === 'day' && (
@@ -207,6 +215,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           onTaskClick={onTaskClick}
           googleEvents={googleEvents}
           onGoogleEventClick={onGoogleEventClick}
+          workBlocks={workBlocks}
+          onWorkBlockAction={onWorkBlockAction}
         />
       )}
     </div>

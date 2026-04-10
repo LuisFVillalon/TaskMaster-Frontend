@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useRef, useEffect } from 'react';
-import { Task } from '@/app/types/task';
+import { Task, WorkBlock } from '@/app/types/task';
 import { GoogleCalendarEvent } from '@/app/types/calendar';
 import { formatTime12Hour } from '@/app/utils/taskUtils';
 
@@ -9,6 +9,8 @@ const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const SLOT_HEIGHT = 60; // px per hour row
 const GOOGLE_BLUE = '#1a73e8';
+const WORK_BLOCK_SUGGESTED = '#7c3aed';  // violet — dashed border
+const WORK_BLOCK_CONFIRMED  = '#059669';  // emerald — solid border
 
 interface WeekViewProps {
   currentDate: Date;
@@ -17,6 +19,8 @@ interface WeekViewProps {
   onTaskClick: (task: Task) => void;
   googleEvents?: GoogleCalendarEvent[];
   onGoogleEventClick?: (event: GoogleCalendarEvent) => void;
+  workBlocks?: WorkBlock[];
+  onWorkBlockAction?: (id: number, status: 'confirmed' | 'dismissed') => void;
 }
 
 const toDateKey = (date: Date): string =>
@@ -61,6 +65,8 @@ const WeekView: React.FC<WeekViewProps> = ({
   onTaskClick,
   googleEvents = [],
   onGoogleEventClick,
+  workBlocks = [],
+  onWorkBlockAction,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const today = new Date();
@@ -113,6 +119,26 @@ const WeekView: React.FC<WeekViewProps> = ({
     });
     return map;
   }, [googleEvents]);
+
+  // Build work block lookup: dateKey → hourly buckets
+  const workBlocksByDate = useMemo(() => {
+    const map: Record<string, Record<number, WorkBlock[]>> = {};
+    workBlocks.forEach(wb => {
+      const key = wb.start_time.slice(0, 10);
+      const hour = new Date(wb.start_time).getHours();
+      if (!map[key]) map[key] = {};
+      if (!map[key][hour]) map[key][hour] = [];
+      map[key][hour].push(wb);
+    });
+    return map;
+  }, [workBlocks]);
+
+  // Task title lookup for work block pills
+  const taskMap = useMemo(() => {
+    const m: Record<number, string> = {};
+    tasks.forEach(t => { m[t.id] = t.title; });
+    return m;
+  }, [tasks]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -218,9 +244,10 @@ const WeekView: React.FC<WeekViewProps> = ({
 
               {/* One slot per day column */}
               {weekDays.map(day => {
-                const key       = toDateKey(day);
-                const hourTasks = tasksByDate[key]?.hourly[hour] ?? [];
-                const hourGcal  = gcalByDate[key]?.hourly[hour]  ?? [];
+                const key        = toDateKey(day);
+                const hourTasks  = tasksByDate[key]?.hourly[hour]      ?? [];
+                const hourGcal   = gcalByDate[key]?.hourly[hour]       ?? [];
+                const hourBlocks = workBlocksByDate[key]?.[hour]       ?? [];
                 const isTodayCol = isSameDay(day, today);
 
                 return (
@@ -272,6 +299,41 @@ const WeekView: React.FC<WeekViewProps> = ({
                           {ev.title}
                         </div>
                       ))}
+                      {hourBlocks.map(wb => {
+                        const color = wb.status === 'confirmed' ? WORK_BLOCK_CONFIRMED : WORK_BLOCK_SUGGESTED;
+                        const title = taskMap[wb.task_id] ?? 'AI Work Block';
+                        return (
+                          <div
+                            key={wb.id}
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                              borderColor: color,
+                              color,
+                              border: `2px ${wb.status === 'confirmed' ? 'solid' : 'dashed'} ${color}`,
+                            }}
+                            className="text-[10px] px-1 py-0.5 rounded mb-0.5 w-full"
+                            title={`${title} — ${wb.ai_reasoning}`}
+                          >
+                            <div className="flex items-center justify-between gap-0.5">
+                              <span className="truncate flex-1">{title}</span>
+                              {wb.status === 'suggested' && onWorkBlockAction && (
+                                <span className="flex gap-0.5 shrink-0">
+                                  <button
+                                    onClick={e => { e.stopPropagation(); onWorkBlockAction(wb.id, 'confirmed'); }}
+                                    title="Confirm"
+                                    className="hover:opacity-70 font-bold leading-none"
+                                  >✓</button>
+                                  <button
+                                    onClick={e => { e.stopPropagation(); onWorkBlockAction(wb.id, 'dismissed'); }}
+                                    title="Dismiss"
+                                    className="hover:opacity-70 font-bold leading-none"
+                                  >✕</button>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );

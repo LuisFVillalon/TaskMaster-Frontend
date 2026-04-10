@@ -96,3 +96,14 @@ export interface StatsData {
   completed: TaskStats;
   urgent: TaskStats;
 }
+
+export interface WorkBlock {
+  id: number;
+  task_id: number;
+  user_id: string;
+  start_time: string;  // ISO 8601
+  end_time: string;    // ISO 8601
+  status: 'suggested' | 'confirmed' | 'dismissed';
+  ai_reasoning: string;
+  confidence: number;
+}

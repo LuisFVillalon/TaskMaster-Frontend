@@ -8,7 +8,7 @@
  * session the call throws so the caller can redirect to /login.
  */
 
-import { Task } from "../types/task";
+import { Task, WorkBlock } from "../types/task";
 import { Note } from "../types/notes";
 import { CalendarSettings, GoogleCalendarEvent } from "../types/calendar";
 import { supabase } from "./supabase";
@@ -348,6 +348,79 @@ export async function disconnectGoogleCalendar(): Promise<void> {
   });
   await assertOk(res, "disconnectGoogleCalendar");
 }
+
+// ── Availability Preferences ──────────────────────────────────────────────────
+
+export interface AvailabilityPreference {
+  id: number;
+  user_id: string;
+  day_of_week: number;  // 0 = Sun … 6 = Sat  (JS Date.getDay())
+  start_time: string;   // "HH:MM" UTC
+  end_time: string;     // "HH:MM" UTC
+  label: string | null;
+}
+
+/** Fetch the user's recurring blackout windows. */
+export async function fetchAvailabilityPreferences(): Promise<AvailabilityPreference[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/availability-preferences`, { headers });
+  await assertOk(res, "fetchAvailabilityPreferences");
+  return res.json();
+}
+
+/** Create a new recurring blackout window. */
+export async function createAvailabilityPreference(pref: {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  label?: string | null;
+}): Promise<AvailabilityPreference> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/availability-preferences`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(pref),
+  });
+  await assertOk(res, "createAvailabilityPreference");
+  return res.json();
+}
+
+/** Delete a blackout window by ID. */
+export async function deleteAvailabilityPreference(id: number): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/availability-preferences/${id}`, {
+    method: 'DELETE',
+    headers,
+  });
+  await assertOk(res, "deleteAvailabilityPreference");
+}
+
+// ── Work Blocks ───────────────────────────────────────────────────────────────
+
+/** Fetches all non-dismissed work blocks for the authenticated user. */
+export async function fetchWorkBlocks(): Promise<WorkBlock[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/work-blocks`, { headers });
+  await assertOk(res, "fetchWorkBlocks");
+  return res.json();
+}
+
+/** Accept or dismiss an AI-suggested work block. */
+export async function updateWorkBlockStatus(
+  id: number,
+  status: 'confirmed' | 'dismissed',
+): Promise<WorkBlock> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/work-blocks/${id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ status }),
+  });
+  await assertOk(res, "updateWorkBlockStatus");
+  return res.json();
+}
+
+// ── Google Calendar ───────────────────────────────────────────────────────────
 
 /**
  * Fetch Google Calendar events for the given ISO 8601 time range.

@@ -31,8 +31,9 @@ These variables are used to render the UI components and handle user interaction
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
-import { claimOrphanedData } from '@/app/lib/backend-api';
-import { Task } from '@/app/types/task';
+import { claimOrphanedData, fetchWorkBlocks, updateWorkBlockStatus } from '@/app/lib/backend-api';
+import { requestScheduleSuggestion } from '@/app/lib/ai-api';
+import { Task, WorkBlock } from '@/app/types/task';
 import { useTasks, useTags } from '@/app/hooks/useTasksAndTags';
 import { useTaskManagerState } from '@/app/hooks/useTaskManagerState';
 import { useTaskHandlers } from '@/app/hooks/useTaskHandlers';
@@ -108,6 +109,32 @@ const TaskManager: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [activeGoogleEvent, setActiveGoogleEvent] = useState<GoogleCalendarEvent | null>(null);
   const { gcalStatus, googleEvents, googleSyncing, gcalError, connectGcal, disconnectGcal, syncGcal } = useGoogleCalendar();
+
+  // ── Work Blocks (Smart Scheduling) ──────────────────────────────────────────
+  const [workBlocks, setWorkBlocks] = useState<WorkBlock[]>([]);
+
+  useEffect(() => {
+    fetchWorkBlocks().then(setWorkBlocks).catch(() => {/* non-critical */});
+  }, []);
+
+  const handleScheduleTask = async (task: Task): Promise<WorkBlock> => {
+    const block = await requestScheduleSuggestion(task);
+    setWorkBlocks(prev => [...prev.filter(b => b.id !== block.id), block]);
+    return block;
+  };
+
+  const handleWorkBlockAction = async (id: number, status: 'confirmed' | 'dismissed') => {
+    try {
+      const updated = await updateWorkBlockStatus(id, status);
+      setWorkBlocks(prev =>
+        status === 'dismissed'
+          ? prev.filter(b => b.id !== id)
+          : prev.map(b => b.id === id ? updated : b),
+      );
+    } catch {
+      // non-critical — block stays in current state
+    }
+  };
 
   // Mobile-specific state
   const [showStats, setShowStats] = useState(false);
@@ -390,6 +417,7 @@ const TaskManager: React.FC = () => {
                         onEditTaskClick={() =>
                           state.setShowEditTaskModal({ status: true, task })
                         }
+                        onScheduleTask={handleScheduleTask}
                       />
                     ))}
                   </div>
@@ -440,6 +468,8 @@ const TaskManager: React.FC = () => {
                   onGoogleEventClick={setActiveGoogleEvent}
                   googleSyncing={googleSyncing}
                   onSync={gcalStatus === 'connected' ? syncGcal : undefined}
+                  workBlocks={workBlocks}
+                  onWorkBlockAction={handleWorkBlockAction}
                 />
               </div>
             </div>
