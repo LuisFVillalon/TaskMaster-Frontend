@@ -148,6 +148,19 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
     }
 
     setPdfLoading(true);
+
+    // Yield to the browser so React can commit the loading-spinner state
+    // before html2canvas blocks the main thread.
+    await new Promise<void>(resolve => setTimeout(resolve, 50));
+
+    // html2canvas requires the source element to be in the live DOM to
+    // resolve styles and fonts.  We mount it off-screen and clean it up
+    // in the finally block whether the export succeeds or fails.
+    const container = document.createElement('div');
+    container.style.cssText =
+      'position:fixed;top:-10000px;left:-10000px;width:794px;visibility:hidden;pointer-events:none;';
+    document.body.appendChild(container);
+
     try {
       const { default: html2pdf } = await import('html2pdf.js');
 
@@ -178,7 +191,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
 
       // Build a styled container — hard-coded colors so html2canvas
       // doesn't inherit unresolved CSS custom properties from the dark theme.
-      const container = document.createElement('div');
       container.innerHTML = `
         <style>
           /* ── Base layout ──────────────────────────────────────────────────── */
@@ -271,6 +283,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         .from(container)
         .save();
     } finally {
+      document.body.removeChild(container);
       setPdfLoading(false);
     }
   };
