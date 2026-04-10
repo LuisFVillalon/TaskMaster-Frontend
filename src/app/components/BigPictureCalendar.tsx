@@ -26,6 +26,86 @@ const parseLocalDate = (iso: string): Date => {
 const formatDate = (date: Date): string =>
   date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+/** Single pulsing placeholder block. All skeleton shapes are built from this. */
+const Bone: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div
+    className={`animate-pulse rounded-lg ${className}`}
+    style={{ backgroundColor: 'var(--tm-border-subtle)' }}
+  />
+);
+
+/**
+ * Pixel-accurate skeleton of BigPictureCalendar.
+ * Preserves every section's dimensions so the layout never shifts when real
+ * data arrives.  The progress-card placeholder uses the neutral surface style
+ * because we don't yet know whether the user is inside their configured range.
+ */
+const BigPictureCalendarSkeleton: React.FC = () => (
+  <div className="card w-full max-w-4xl mx-auto h-full p-6">
+
+    {/* Header */}
+    <div className="mb-5">
+      <Bone className="h-9 w-3/5 mb-2.5" />
+      <Bone className="h-4 w-1/4" />
+    </div>
+
+    {/* Current Date box */}
+    <div
+      className="mb-5 p-4 rounded-xl border border-border-subtle"
+      style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+    >
+      <Bone className="h-3 w-20 mb-2" />
+      <Bone className="h-7 w-52" />
+    </div>
+
+    {/* Date Range Inputs */}
+    <div className="grid grid-cols-2 gap-3 mb-5">
+      {[0, 1].map(i => (
+        <div key={i}>
+          <Bone className="h-3 w-16 mb-1.5" />
+          <Bone className="h-10 w-full" />
+        </div>
+      ))}
+    </div>
+
+    {/* Progress card */}
+    <div
+      className="p-5 rounded-xl border-2 border-border"
+      style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+    >
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex-1 mr-8">
+          <Bone className="h-7 w-3/4 mb-2.5" />
+          <Bone className="h-4 w-full" />
+        </div>
+        <div className="flex-shrink-0">
+          <Bone className="h-10 w-24 mb-1.5" />
+          <Bone className="h-4 w-12 ml-auto" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {[0, 1].map(i => (
+          <div
+            key={i}
+            className="p-3 rounded-lg"
+            style={{ backgroundColor: 'var(--tm-surface)' }}
+          >
+            <Bone className="h-3 w-28 mb-2.5" />
+            <Bone className="h-8 w-14" />
+          </div>
+        ))}
+      </div>
+
+      {/* Progress bar */}
+      <Bone className="h-3 w-full rounded-full mb-1.5" />
+      <Bone className="h-3 w-16 mx-auto" />
+    </div>
+  </div>
+);
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -33,6 +113,8 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 const BigPictureCalendar: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [settings, setSettings] = useState<CalendarSettings | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [fadeIn, setFadeIn]     = useState(false);
   const [editingField, setEditingField] = useState<'title' | 'sub_header' | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,7 +129,15 @@ const BigPictureCalendar: React.FC = () => {
   useEffect(() => {
     fetchCalendarSettings()
       .then(data => { if (data !== null) setSettings(data); })
-      .catch(() => { /* network / auth error — keep showing DEFAULTS */ });
+      .catch(() => { /* network / auth error — keep showing DEFAULTS */ })
+      .finally(() => {
+        setLoading(false);
+        // Double rAF: React commits the opacity-0 real content on the first
+        // frame; the second frame triggers the transition to opacity-100.
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => setFadeIn(true)),
+        );
+      });
   }, []);
 
   // Focus the input when entering edit mode
@@ -120,6 +210,8 @@ const BigPictureCalendar: React.FC = () => {
   }, [settings, currentDate]);
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (loading) return <BigPictureCalendarSkeleton />;
+
   const cur = settings ?? { id: 0, ...DEFAULTS };
 
   const saveIndicator = (
@@ -135,7 +227,11 @@ const BigPictureCalendar: React.FC = () => {
   );
 
   return (
-    <div className="card w-full max-w-4xl mx-auto h-full p-6">
+    <div
+      className={`card w-full max-w-4xl mx-auto h-full p-6 transition-opacity duration-500 ease-out ${
+        fadeIn ? 'opacity-100' : 'opacity-0'
+      }`}
+    >
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="mb-5">
