@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { Bold, ChevronDown, ChevronUp, Download, FileText, Italic, Library, List, ListOrdered, Loader2, Save } from 'lucide-react';
+import { Bold, ChevronDown, ChevronUp, Download, FileText, Italic, Library, List, ListOrdered, Loader2, PanelLeftClose, PanelLeftOpen, Save } from 'lucide-react';
 import { Note } from '@/app/types/notes';
 import { Tag } from '@/app/types/task';
 
@@ -13,6 +13,8 @@ interface NoteEditorProps {
   onUpdate: (id: number, changes: Partial<Pick<Note, 'title' | 'content' | 'tags'>>) => void;
   showResources?: boolean;
   onToggleResources?: () => void;
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 // ─── Toolbar button ────────────────────────────────────────────────────────────
@@ -57,7 +59,7 @@ const ToolbarBtn: React.FC<ToolbarBtnProps> = ({ onClick, active, title, childre
 
 // ─── NoteEditor ───────────────────────────────────────────────────────────────
 
-const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showResources = false, onToggleResources }) => {
+const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showResources = false, onToggleResources, sidebarOpen = true, onToggleSidebar }) => {
   const [title, setTitle] = useState(note?.title ?? '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -278,18 +280,46 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
   if (!note) {
     return (
       <div
-        className="flex-1 flex items-center justify-center"
+        className="flex-1 flex flex-col overflow-hidden"
         style={{ backgroundColor: 'var(--tm-surface)' }}
       >
-        <div className="text-center">
+        {onToggleSidebar && (
           <div
-            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+            className="hidden sm:flex items-center gap-0.5 px-4 py-2 border-b border-border-subtle shrink-0"
             style={{ backgroundColor: 'var(--tm-surface-raised)' }}
           >
-            <FileText className="w-8 h-8 text-text-muted" />
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+              className="flex px-2 py-1.5 rounded-lg text-sm transition-colors"
+              style={{ color: 'var(--tm-text-secondary)' }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--tm-surface-raised)';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--tm-text-primary)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = '';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--tm-text-secondary)';
+              }}
+            >
+              {sidebarOpen
+                ? <PanelLeftClose className="w-4 h-4" />
+                : <PanelLeftOpen className="w-4 h-4" />}
+            </button>
           </div>
-          <h3 className="text-base font-semibold text-text-muted mb-1">No note selected</h3>
-          <p className="text-sm text-text-muted">Select a note from the sidebar or create a new one</p>
+        )}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+              style={{ backgroundColor: 'var(--tm-surface-raised)' }}
+            >
+              <FileText className="w-8 h-8 text-text-muted" />
+            </div>
+            <h3 className="text-base font-semibold text-text-muted mb-1">No note selected</h3>
+            <p className="text-sm text-text-muted">Select a note from the sidebar or create a new one</p>
+          </div>
         </div>
       </div>
     );
@@ -305,6 +335,32 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         className="flex items-center gap-0.5 px-4 py-2 border-b border-border-subtle flex-wrap"
         style={{ backgroundColor: 'var(--tm-surface-raised)' }}
       >
+        {/* Sidebar toggle — desktop only */}
+        {onToggleSidebar && (
+          <>
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+              className="hidden sm:flex px-2 py-1.5 rounded-lg text-sm transition-colors"
+              style={{ color: 'var(--tm-text-secondary)' }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--tm-surface-raised)';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--tm-text-primary)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = '';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--tm-text-secondary)';
+              }}
+            >
+              {sidebarOpen
+                ? <PanelLeftClose className="w-4 h-4" />
+                : <PanelLeftOpen className="w-4 h-4" />}
+            </button>
+            <div className="hidden sm:block w-px h-5 mx-1 shrink-0" style={{ backgroundColor: 'var(--tm-border)' }} />
+          </>
+        )}
+
         <ToolbarBtn
           onClick={() => editor?.chain().focus().toggleBold().run()}
           active={editor?.isActive('bold') ?? false}

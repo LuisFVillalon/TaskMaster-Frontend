@@ -215,7 +215,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({
                   return (
                     <span
                       key={tag.id}
-                      className="chip"
+                      className="px-3 py-2 rounded-lg chip"
                       style={{ backgroundColor: tagData?.color ?? 'var(--tm-accent)', color: 'white' }}
                     >
                       {tag.name}

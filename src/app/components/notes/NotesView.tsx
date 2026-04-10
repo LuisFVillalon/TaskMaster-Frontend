@@ -37,6 +37,7 @@ const NotesView: React.FC<NotesViewProps> = ({ embedded = false }) => {
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
   const [showResources, setShowResources] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const initialSelectionApplied = useRef(false);
 
   // Auto-select the note specified in ?id=<noteId> on initial load only.
@@ -97,23 +98,27 @@ const NotesView: React.FC<NotesViewProps> = ({ embedded = false }) => {
     >
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <div
-        className={`w-72 flex-shrink-0 border-r border-border-subtle flex-col ${
+        className={`flex-shrink-0 flex-col overflow-hidden transition-[width] duration-300 ease-in-out ${
           mobileView === 'editor' ? 'hidden sm:flex' : 'flex'
-        }`}
+        } ${sidebarOpen ? 'border-r border-border-subtle' : ''}`}
+        style={{ width: sidebarOpen ? '18rem' : '0' }}
       >
-        <NotesList
-          notes={filteredNotes}
-          activeNoteId={activeNoteId}
-          allTags={tags}
-          selectedTags={selectedTags}
-          onTagToggle={handleTagToggle}
-          onClearTags={handleClearTags}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          onSelectNote={handleSelectNote}
-          onNewNote={handleNewNote}
-          onDeleteNote={handleDeleteNote}
-        />
+        {/* Inner wrapper keeps content at full width while outer clips it */}
+        <div className="min-w-[18rem] flex flex-col flex-1 overflow-hidden">
+          <NotesList
+            notes={filteredNotes}
+            activeNoteId={activeNoteId}
+            allTags={tags}
+            selectedTags={selectedTags}
+            onTagToggle={handleTagToggle}
+            onClearTags={handleClearTags}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            onSelectNote={handleSelectNote}
+            onNewNote={handleNewNote}
+            onDeleteNote={handleDeleteNote}
+          />
+        </div>
       </div>
 
       {/* ── Editor panel ────────────────────────────────────────────── */}
@@ -138,6 +143,8 @@ const NotesView: React.FC<NotesViewProps> = ({ embedded = false }) => {
           onUpdate={updateNote}
           showResources={showResources}
           onToggleResources={() => setShowResources(v => !v)}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(v => !v)}
         />
       </div>
 
