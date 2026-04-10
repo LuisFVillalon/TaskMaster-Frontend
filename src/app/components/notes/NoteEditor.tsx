@@ -64,6 +64,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [emptyToast, setEmptyToast] = useState(false);
+  const [pdfError, setPdfError] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
 
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -149,16 +150,22 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
 
     setPdfLoading(true);
 
-    // Yield to the browser so React can commit the loading-spinner state
-    // before html2canvas blocks the main thread.
+    // Yield so React can paint the loading spinner before the main thread
+    // is blocked by the canvas rendering work.
     await new Promise<void>(resolve => setTimeout(resolve, 50));
 
-    // html2canvas requires the source element to be in the live DOM to
-    // resolve styles and fonts.  We mount it off-screen and clean it up
-    // in the finally block whether the export succeeds or fails.
+    // ── Off-screen mount ──────────────────────────────────────────────────
+    // html2canvas internally calls getBoundingClientRect() and then does
+    // ctx.translate(-rect.left, -rect.top) so that the element's top-left
+    // corner maps to (0, 0) in the canvas.  A NEGATIVE top value (e.g.
+    // top: -10000px) shifts the translate to +10000, pushing all content
+    // past the right/bottom edge of the canvas and producing a blank frame.
+    // Keeping top: 0 and moving only left off-screen avoids that problem.
+    // background + color ensure no oklch values are inherited for these
+    // two properties, which html2canvas reads before the onclone sweep.
     const container = document.createElement('div');
     container.style.cssText =
-      'position:fixed;top:-10000px;left:-10000px;width:794px;visibility:hidden;pointer-events:none;';
+      'position:absolute;top:0;left:-9999px;width:794px;background:#ffffff;color:#1f2937;pointer-events:none;';
     document.body.appendChild(container);
 
     try {
@@ -191,13 +198,15 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
 
       // Build a styled container — hard-coded colors so html2canvas
       // doesn't inherit unresolved CSS custom properties from the dark theme.
+      // The <style> lives in <body> (inside container) so the onclone sweep
+      // of head > style leaves it intact.
       container.innerHTML = `
         <style>
           /* ── Base layout ──────────────────────────────────────────────────── */
           /* Force block display — flex/grid containers confuse html2canvas's
              page-break measurements and can cause mis-aligned slice boundaries. */
           .pdf-root, .pdf-body { display: block; }
-          .pdf-root  { font-family: Georgia, serif; padding: 0; color: #1f2937; }
+          .pdf-root  { font-family: Georgia, serif; padding: 0; color: #1f2937; background: #ffffff; }
           .pdf-title { font-size: 26px; font-weight: 700; color: #111827; margin: 0 0 18px; line-height: 1.25; }
           .pdf-divider { border: none; border-top: 1px solid #e5e7eb; margin: 0 0 18px; }
 
@@ -213,25 +222,18 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
           .pdf-body code      { font-family: monospace; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
 
           /* ── Page-break prevention ────────────────────────────────────────── */
-          /* Paragraphs and list items: never slice a line in half. */
           .pdf-body p,
           .pdf-body li,
           .pdf-body blockquote,
           .pdf-body pre {
-            break-inside:      avoid;   /* modern spec */
-            page-break-inside: avoid;   /* legacy webkit fallback */
+            break-inside:      avoid;
+            page-break-inside: avoid;
           }
-
-          /* Widows/orphans: require at least 3 lines at page top and bottom,
-             preventing single "orphan" or "widow" lines being left alone. */
           .pdf-body p,
           .pdf-body li {
             orphans: 3;
             widows:  3;
           }
-
-          /* Headings: keep the heading on the same page as the content that
-             follows it — never leave a heading stranded at the bottom of a page. */
           .pdf-body h1,
           .pdf-body h2 {
             break-after:      avoid;
@@ -239,8 +241,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
             break-inside:      avoid;
             page-break-inside: avoid;
           }
-
-          /* List blocks: keep the whole list together when it fits on one page. */
           .pdf-body ul,
           .pdf-body ol {
             break-inside:      avoid;
@@ -254,6 +254,23 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         </div>
       `;
 
+      // Wait for the browser to perform layout on the newly-injected HTML
+      // before html2canvas reads dimensions.  Two rAF calls guarantee that
+      // both the style recalc pass and the layout pass have completed.
+      await new Promise<void>(resolve =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      );
+
+      // ── Dimension diagnostics ─────────────────────────────────────────
+      const pdfRoot = container.querySelector('.pdf-root') as HTMLElement | null;
+      const rect    = container.getBoundingClientRect();
+      console.log('[PDF export] container BoundingClientRect:', rect);
+      console.log('[PDF export] container offset:', container.offsetWidth, '×', container.offsetHeight);
+      console.log('[PDF export] .pdf-root offset:', pdfRoot?.offsetWidth, '×', pdfRoot?.offsetHeight);
+      console.log('[PDF export] editor HTML length:', editor.getHTML().length);
+
+      if (!pdfRoot) throw new Error('[PDF export] .pdf-root element not found');
+
       // Stored in a variable so TypeScript applies excess-property checking
       // against PdfOptions (which includes pagebreak) rather than against
       // Html2PdfOptions (which doesn't), avoiding a TS2353 build error.
@@ -266,22 +283,38 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
           useCORS: true,
           logging: false,
           // Lock the render viewport to A4 width at 96 dpi (794 px).
-          // Without this, html2canvas uses the live browser window width,
-          // which makes page-slice boundaries land at unpredictable positions
-          // relative to the text lines.
           windowWidth: 794,
+          // Tailwind v4 defines its entire color palette using oklch(), which
+          // html2canvas's color parser cannot handle — causing it to hang.
+          // Stripping every head-level stylesheet from the cloned document
+          // before rendering leaves only our container's embedded <style>
+          // (which lives in <body> and survives this sweep), ensuring all
+          // colors resolve to plain hex values that html2canvas can parse.
+          onclone: (clonedDoc: Document) => {
+            clonedDoc
+              .querySelectorAll('head > link[rel="stylesheet"], head > style')
+              .forEach(node => node.parentNode?.removeChild(node));
+          },
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         // 'avoid-all' measures every element's bounding box before slicing
         // and pushes any element that would be cut to the top of the next page.
-        // This is the primary safeguard against horizontal text clipping.
         pagebreak: { mode: ['avoid-all'] },
       };
 
-      await html2pdf()
-        .set(pdfOptions)
-        .from(container)
-        .save();
+      // Pass pdfRoot (not the outer container) so html2canvas measures only
+      // the visible content div — the sibling <style> tag would add zero
+      // layout height but can confuse some versions of html2canvas.
+      try {
+        await html2pdf()
+          .set(pdfOptions)
+          .from(pdfRoot)
+          .save();
+      } catch (err) {
+        console.error('[PDF export] html2pdf error:', err);
+        setPdfError(true);
+        setTimeout(() => setPdfError(false), 3000);
+      }
     } finally {
       document.body.removeChild(container);
       setPdfLoading(false);
@@ -589,13 +622,21 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         <EditorContent editor={editor} />
       </div>
 
-      {/* ── Empty note toast ─────────────────────────────────────────────── */}
+      {/* ── Toasts ───────────────────────────────────────────────────────── */}
       {emptyToast && (
         <div
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-medium shadow-lg pointer-events-none transition-opacity"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-medium shadow-lg pointer-events-none"
           style={{ backgroundColor: 'var(--tm-surface-raised)', color: 'var(--tm-text-secondary)', border: '1px solid var(--tm-border)' }}
         >
           Note is empty — add some content first.
+        </div>
+      )}
+      {pdfError && (
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-medium shadow-lg pointer-events-none"
+          style={{ backgroundColor: 'var(--tm-danger-subtle)', color: 'var(--tm-danger)', border: '1px solid var(--tm-danger)' }}
+        >
+          PDF export failed — please try again.
         </div>
       )}
 

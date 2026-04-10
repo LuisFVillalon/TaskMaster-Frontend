@@ -39,17 +39,27 @@ interface AuthContextValue {
  * trailing slash so callers can safely append path segments.
  *
  * Resolution order:
- *  1. NEXT_PUBLIC_SITE_URL       — explicit canonical URL set in Vercel env
+ *  1. localhost short-circuit    — always uses window.location.origin so that
+ *                                   NEXT_PUBLIC_SITE_URL (a production value)
+ *                                   can never hijack local OAuth redirects.
+ *  2. NEXT_PUBLIC_SITE_URL       — explicit canonical URL set in Vercel env
  *                                   vars (e.g. https://task-master-mvp.vercel.app).
  *                                   Set this once in Vercel → Settings → Environment
- *                                   Variables for the Production environment.
- *  2. NEXT_PUBLIC_VERCEL_URL     — automatically injected by Vercel for every
+ *                                   Variables for the Production environment only —
+ *                                   never in .env on disk.
+ *  3. NEXT_PUBLIC_VERCEL_URL     — automatically injected by Vercel for every
  *                                   deployment. Does NOT include the protocol,
  *                                   so we prepend https://.
- *  3. window.location.origin     — correct for localhost in development and
- *                                   for any other environment not covered above.
+ *  4. window.location.origin     — fallback for any environment not covered above.
  */
 function getURL(): string {
+  // Always use the real origin on localhost regardless of any env var,
+  // so a production NEXT_PUBLIC_SITE_URL set by mistake never redirects
+  // a dev session to the wrong host.
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return `${window.location.origin}/`;
+  }
+
   let url: string =
     process.env.NEXT_PUBLIC_SITE_URL ??
     process.env.NEXT_PUBLIC_VERCEL_URL ??
