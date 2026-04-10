@@ -3,9 +3,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { Bold, ChevronDown, ChevronUp, Download, FileText, Italic, Library, List, ListOrdered, Loader2, PanelLeftClose, PanelLeftOpen, Save } from 'lucide-react';
+import TiptapImage from '@tiptap/extension-image';
+import TiptapHighlight from '@tiptap/extension-highlight';
+import {
+  Bold, ChevronDown, ChevronUp, Download, FileText, Highlighter,
+  Italic, Library, List, ListOrdered, Loader2,
+  PanelLeftClose, PanelLeftOpen, Save,
+} from 'lucide-react';
 import { Note } from '@/app/types/notes';
 import { Tag } from '@/app/types/task';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Defined outside the component so identity is stable across renders. */
+const HIGHLIGHT_COLORS = [
+  { color: '#fef08a', label: 'Yellow' },
+  { color: '#bbf7d0', label: 'Green' },
+  { color: '#bae6fd', label: 'Blue' },
+  { color: '#fbcfe8', label: 'Pink' },
+  { color: '#fed7aa', label: 'Orange' },
+] as const;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface NoteEditorProps {
   note: Note | null;
@@ -59,25 +78,101 @@ const ToolbarBtn: React.FC<ToolbarBtnProps> = ({ onClick, active, title, childre
 
 // ─── NoteEditor ───────────────────────────────────────────────────────────────
 
-const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showResources = false, onToggleResources, sidebarOpen = true, onToggleSidebar }) => {
-  const [title, setTitle] = useState(note?.title ?? '');
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [emptyToast, setEmptyToast] = useState(false);
-  const [pdfError, setPdfError] = useState(false);
-  const [tagsOpen, setTagsOpen] = useState(false);
+const NoteEditor: React.FC<NoteEditorProps> = ({
+  note, allTags, onUpdate,
+  showResources = false, onToggleResources,
+  sidebarOpen = true, onToggleSidebar,
+}) => {
+  const [title, setTitle]               = useState(note?.title ?? '');
+  const [saveStatus, setSaveStatus]     = useState<'idle' | 'saved'>('idle');
+  const [pdfLoading, setPdfLoading]     = useState(false);
+  const [emptyToast, setEmptyToast]     = useState(false);
+  const [pdfError, setPdfError]         = useState(false);
+  const [tagsOpen, setTagsOpen]         = useState(false);
+  const [highlightOpen, setHighlightOpen] = useState(false);
 
-  const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savedTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentTimer       = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleTimer         = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimer         = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const highlightPickerRef = useRef<HTMLDivElement>(null);
 
+  // Close highlight picker when clicking outside it
+  useEffect(() => {
+    if (!highlightOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (highlightPickerRef.current && !highlightPickerRef.current.contains(e.target as Node)) {
+        setHighlightOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [highlightOpen]);
+
+  // ── Editor setup ───────────────────────────────────────────────────────────
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit,
+
+      // Image: base64 data-URIs are stored in note HTML so images survive
+      // page reloads without a separate upload service.
+      TiptapImage.configure({
+        allowBase64: true,
+        HTMLAttributes: { class: 'note-img' },
+      }),
+
+      // Highlight: multicolor=true lets each mark carry its own background-color.
+      TiptapHighlight.configure({ multicolor: true }),
+    ],
     content: note?.content ?? '',
     immediatelyRender: false,
     editorProps: {
-      attributes: {
-        class: 'notes-editor focus:outline-none min-h-[400px]',
+      attributes: { class: 'notes-editor focus:outline-none min-h-[400px]' },
+
+      // ── Tab indentation ────────────────────────────────────────────────────
+      // Insert 4 spaces at the cursor when Tab is pressed outside a list.
+      // Inside a list, StarterKit's built-in sink/lift behaviour is preserved
+      // by returning false so ProseMirror continues its normal dispatch.
+      handleKeyDown(view, event) {
+        if (event.key !== 'Tab') return false;
+
+        // Walk up the node ancestry; if any ancestor is a listItem, let
+        // StarterKit handle the Tab (sinkListItem / liftListItem).
+        const { $from } = view.state.selection;
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type.name === 'listItem') return false;
+        }
+
+        event.preventDefault();
+        view.dispatch(view.state.tr.insertText('    '));
+        return true;
+      },
+
+      // ── Image paste ───────────────────────────────────────────────────────
+      // Intercept clipboard events that contain an image file, convert to a
+      // base64 data-URI, then insert an <img> node into the document.
+      handlePaste(view, event) {
+        const items = Array.from(event.clipboardData?.items ?? []);
+        const imgItem = items.find(i => i.type.startsWith('image/'));
+        if (!imgItem) return false;
+
+        event.preventDefault();
+        const file = imgItem.getAsFile();
+        if (!file) return false;
+
+        const reader = new FileReader();
+        reader.onload = readerEvent => {
+          const src = readerEvent.target?.result as string;
+          if (!src) return;
+          const imageNode = view.state.schema.nodes.image;
+          if (!imageNode) return;
+          view.dispatch(
+            view.state.tr.replaceSelectionWith(
+              imageNode.create({ src }),
+            ),
+          );
+        };
+        reader.readAsDataURL(file);
+        return true;
       },
     },
     onUpdate: ({ editor }) => {
@@ -111,6 +206,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
     };
   }, []);
 
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
   const handleTitleChange = (value: string) => {
     setTitle(value);
     if (!note) return;
@@ -141,7 +238,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
   const handleDownloadPDF = async () => {
     if (!note || !editor) return;
 
-    // Guard: treat editor as empty if only whitespace / empty paragraph remains
     if (editor.isEmpty) {
       setEmptyToast(true);
       setTimeout(() => setEmptyToast(false), 2500);
@@ -150,19 +246,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
 
     setPdfLoading(true);
 
-    // Yield so React can paint the loading spinner before the main thread
-    // is blocked by the canvas rendering work.
     await new Promise<void>(resolve => setTimeout(resolve, 50));
 
-    // ── Off-screen mount ──────────────────────────────────────────────────
-    // html2canvas internally calls getBoundingClientRect() and then does
-    // ctx.translate(-rect.left, -rect.top) so that the element's top-left
-    // corner maps to (0, 0) in the canvas.  A NEGATIVE top value (e.g.
-    // top: -10000px) shifts the translate to +10000, pushing all content
-    // past the right/bottom edge of the canvas and producing a blank frame.
-    // Keeping top: 0 and moving only left off-screen avoids that problem.
-    // background + color ensure no oklch values are inherited for these
-    // two properties, which html2canvas reads before the onclone sweep.
     const container = document.createElement('div');
     container.style.cssText =
       'position:absolute;top:0;left:-9999px;width:794px;background:#ffffff;color:#1f2937;pointer-events:none;';
@@ -171,14 +256,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
     try {
       const { default: html2pdf } = await import('html2pdf.js');
 
-      // Html2PdfOptions in the published type.d.ts omits `pagebreak` even
-      // though the library supports it.  We define a local extension so
-      // TypeScript accepts the option without resorting to `as any`.
-      //
-      // ReturnType / InstanceType<typeof html2pdf> both resolve to Promise<void>
-      // because TypeScript picks the *last* overload.  The Html2PdfStatic.Worker
-      // property is a single-signature constructor (new () => Html2PdfWorker), so
-      // InstanceType of *that* reliably gives us Html2PdfWorker and its set() type.
       type PdfOptions = Parameters<InstanceType<(typeof html2pdf)['Worker']>['set']>[0] & {
         pagebreak?: {
           mode?:   ('avoid-all' | 'css' | 'legacy') | ('avoid-all' | 'css' | 'legacy')[];
@@ -196,21 +273,13 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         .slice(0, 80);
       const filename = `${safeTitle}_${today}.pdf`;
 
-      // Build a styled container — hard-coded colors so html2canvas
-      // doesn't inherit unresolved CSS custom properties from the dark theme.
-      // The <style> lives in <body> (inside container) so the onclone sweep
-      // of head > style leaves it intact.
       container.innerHTML = `
         <style>
-          /* ── Base layout ──────────────────────────────────────────────────── */
-          /* Force block display — flex/grid containers confuse html2canvas's
-             page-break measurements and can cause mis-aligned slice boundaries. */
           .pdf-root, .pdf-body { display: block; }
           .pdf-root  { font-family: Georgia, serif; padding: 0; color: #1f2937; background: #ffffff; }
           .pdf-title { font-size: 26px; font-weight: 700; color: #111827; margin: 0 0 18px; line-height: 1.25; }
           .pdf-divider { border: none; border-top: 1px solid #e5e7eb; margin: 0 0 18px; }
 
-          /* ── Typography ───────────────────────────────────────────────────── */
           .pdf-body h1 { font-size: 20px; font-weight: 700; color: #111827; margin: 18px 0 6px; line-height: 1.2; }
           .pdf-body h2 { font-size: 16px; font-weight: 700; color: #111827; margin: 14px 0 4px; line-height: 1.3; }
           .pdf-body p  { font-size: 13px; color: #374151; line-height: 1.75; margin: 0 0 10px; }
@@ -220,32 +289,18 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
           .pdf-body em        { font-style: italic; }
           .pdf-body blockquote { border-left: 3px solid #d1d5db; padding-left: 12px; color: #6b7280; margin: 8px 0; }
           .pdf-body code      { font-family: monospace; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+          .pdf-body mark      { border-radius: 2px; padding: 0 2px; }
+          .pdf-body img       { max-width: 100%; height: auto; border-radius: 6px; margin: 6px 0; display: block; }
 
-          /* ── Page-break prevention ────────────────────────────────────────── */
-          .pdf-body p,
-          .pdf-body li,
-          .pdf-body blockquote,
-          .pdf-body pre {
-            break-inside:      avoid;
-            page-break-inside: avoid;
+          .pdf-body p, .pdf-body li, .pdf-body blockquote, .pdf-body pre {
+            break-inside: avoid; page-break-inside: avoid;
           }
-          .pdf-body p,
-          .pdf-body li {
-            orphans: 3;
-            widows:  3;
+          .pdf-body p, .pdf-body li { orphans: 3; widows: 3; }
+          .pdf-body h1, .pdf-body h2 {
+            break-after: avoid; page-break-after: avoid;
+            break-inside: avoid; page-break-inside: avoid;
           }
-          .pdf-body h1,
-          .pdf-body h2 {
-            break-after:      avoid;
-            page-break-after: avoid;
-            break-inside:      avoid;
-            page-break-inside: avoid;
-          }
-          .pdf-body ul,
-          .pdf-body ol {
-            break-inside:      avoid;
-            page-break-inside: avoid;
-          }
+          .pdf-body ul, .pdf-body ol { break-inside: avoid; page-break-inside: avoid; }
         </style>
         <div class="pdf-root">
           <h1 class="pdf-title">${title || 'Untitled Note'}</h1>
@@ -254,26 +309,16 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         </div>
       `;
 
-      // Wait for the browser to perform layout on the newly-injected HTML
-      // before html2canvas reads dimensions.  Two rAF calls guarantee that
-      // both the style recalc pass and the layout pass have completed.
       await new Promise<void>(resolve =>
         requestAnimationFrame(() => requestAnimationFrame(resolve)),
       );
 
-      // ── Dimension diagnostics ─────────────────────────────────────────
       const pdfRoot = container.querySelector('.pdf-root') as HTMLElement | null;
-      const rect    = container.getBoundingClientRect();
-      console.log('[PDF export] container BoundingClientRect:', rect);
       console.log('[PDF export] container offset:', container.offsetWidth, '×', container.offsetHeight);
       console.log('[PDF export] .pdf-root offset:', pdfRoot?.offsetWidth, '×', pdfRoot?.offsetHeight);
-      console.log('[PDF export] editor HTML length:', editor.getHTML().length);
 
       if (!pdfRoot) throw new Error('[PDF export] .pdf-root element not found');
 
-      // Stored in a variable so TypeScript applies excess-property checking
-      // against PdfOptions (which includes pagebreak) rather than against
-      // Html2PdfOptions (which doesn't), avoiding a TS2353 build error.
       const pdfOptions: PdfOptions = {
         margin: [14, 14, 14, 14],
         filename,
@@ -282,14 +327,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
           scale: 2,
           useCORS: true,
           logging: false,
-          // Lock the render viewport to A4 width at 96 dpi (794 px).
           windowWidth: 794,
-          // Tailwind v4 defines its entire color palette using oklch(), which
-          // html2canvas's color parser cannot handle — causing it to hang.
-          // Stripping every head-level stylesheet from the cloned document
-          // before rendering leaves only our container's embedded <style>
-          // (which lives in <body> and survives this sweep), ensuring all
-          // colors resolve to plain hex values that html2canvas can parse.
           onclone: (clonedDoc: Document) => {
             clonedDoc
               .querySelectorAll('head > link[rel="stylesheet"], head > style')
@@ -297,19 +335,11 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
           },
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        // 'avoid-all' measures every element's bounding box before slicing
-        // and pushes any element that would be cut to the top of the next page.
         pagebreak: { mode: ['avoid-all'] },
       };
 
-      // Pass pdfRoot (not the outer container) so html2canvas measures only
-      // the visible content div — the sibling <style> tag would add zero
-      // layout height but can confuse some versions of html2canvas.
       try {
-        await html2pdf()
-          .set(pdfOptions)
-          .from(pdfRoot)
-          .save();
+        await html2pdf().set(pdfOptions).from(pdfRoot).save();
       } catch (err) {
         console.error('[PDF export] html2pdf error:', err);
         setPdfError(true);
@@ -325,10 +355,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
 
   if (!note) {
     return (
-      <div
-        className="flex-1 flex flex-col overflow-hidden"
-        style={{ backgroundColor: 'var(--tm-surface)' }}
-      >
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--tm-surface)' }}>
         {onToggleSidebar && (
           <div
             className="hidden sm:flex items-center gap-0.5 px-4 py-2 border-b border-border-subtle shrink-0"
@@ -349,9 +376,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
                 (e.currentTarget as HTMLButtonElement).style.color = 'var(--tm-text-secondary)';
               }}
             >
-              {sidebarOpen
-                ? <PanelLeftClose className="w-4 h-4" />
-                : <PanelLeftOpen className="w-4 h-4" />}
+              {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
             </button>
           </div>
         )}
@@ -371,6 +396,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
     );
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div
       className="flex-1 flex flex-col overflow-hidden relative"
@@ -381,7 +408,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         className="flex items-center gap-0.5 px-4 py-2 border-b border-border-subtle flex-wrap"
         style={{ backgroundColor: 'var(--tm-surface-raised)' }}
       >
-        {/* Sidebar toggle — desktop only */}
+        {/* Sidebar toggle */}
         {onToggleSidebar && (
           <>
             <button
@@ -399,14 +426,13 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
                 (e.currentTarget as HTMLButtonElement).style.color = 'var(--tm-text-secondary)';
               }}
             >
-              {sidebarOpen
-                ? <PanelLeftClose className="w-4 h-4" />
-                : <PanelLeftOpen className="w-4 h-4" />}
+              {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
             </button>
             <div className="hidden sm:block w-px h-5 mx-1 shrink-0" style={{ backgroundColor: 'var(--tm-border)' }} />
           </>
         )}
 
+        {/* Bold / Italic */}
         <ToolbarBtn
           onClick={() => editor?.chain().focus().toggleBold().run()}
           active={editor?.isActive('bold') ?? false}
@@ -425,6 +451,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
 
         <div className="w-px h-5 mx-1 shrink-0" style={{ backgroundColor: 'var(--tm-border)' }} />
 
+        {/* Headings */}
         <ToolbarBtn
           onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
           active={editor?.isActive('heading', { level: 1 }) ?? false}
@@ -443,6 +470,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
 
         <div className="w-px h-5 mx-1 shrink-0" style={{ backgroundColor: 'var(--tm-border)' }} />
 
+        {/* Lists */}
         <ToolbarBtn
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
           active={editor?.isActive('bulletList') ?? false}
@@ -459,7 +487,88 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
           <ListOrdered className="w-4 h-4" />
         </ToolbarBtn>
 
-        {/* Download PDF + Smart Resources + Save — pushed to the far right */}
+        <div className="w-px h-5 mx-1 shrink-0" style={{ backgroundColor: 'var(--tm-border)' }} />
+
+        {/* ── Highlight colour picker ───────────────────────────────────── */}
+        {/*
+          The entire widget (trigger button + popover) shares one ref so the
+          outside-click handler can tell whether a click originated inside it.
+        */}
+        <div ref={highlightPickerRef} className="relative">
+          <ToolbarBtn
+            onClick={() => setHighlightOpen(v => !v)}
+            active={editor?.isActive('highlight') ?? false}
+            title="Highlight text"
+          >
+            <Highlighter className="w-4 h-4" />
+          </ToolbarBtn>
+
+          {highlightOpen && (
+            <div
+              className="absolute top-full left-0 mt-1.5 p-2 rounded-xl shadow-lg z-50 flex items-center gap-1.5"
+              style={{
+                backgroundColor: 'var(--tm-surface-raised)',
+                border: '1px solid var(--tm-border)',
+              }}
+            >
+              {/* Colour swatches */}
+              {HIGHLIGHT_COLORS.map(({ color, label }) => {
+                const isActive = editor?.isActive('highlight', { color }) ?? false;
+                return (
+                  <button
+                    key={color}
+                    type="button"
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      if (isActive) {
+                        editor?.chain().focus().unsetHighlight().run();
+                      } else {
+                        editor?.chain().focus().setHighlight({ color }).run();
+                      }
+                      setHighlightOpen(false);
+                    }}
+                    title={label}
+                    className="w-6 h-6 rounded-md transition-transform hover:scale-110 active:scale-95"
+                    style={{
+                      backgroundColor: color,
+                      outline: isActive ? '2px solid var(--tm-accent)' : '2px solid transparent',
+                      outlineOffset: '1px',
+                    }}
+                  />
+                );
+              })}
+
+              {/* Divider */}
+              <div className="w-px h-4 mx-0.5 shrink-0" style={{ backgroundColor: 'var(--tm-border)' }} />
+
+              {/* Remove highlight */}
+              <button
+                type="button"
+                onMouseDown={e => {
+                  e.preventDefault();
+                  editor?.chain().focus().unsetHighlight().run();
+                  setHighlightOpen(false);
+                }}
+                title="Remove highlight"
+                className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold transition-colors"
+                style={{
+                  color: 'var(--tm-text-muted)',
+                  border: '1px solid var(--tm-border)',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--tm-surface)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Right-side actions */}
         <div className="ml-auto flex items-center gap-2">
           {/* Download PDF */}
           <button
@@ -543,7 +652,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
       {/* ── Tag picker (collapsible) ──────────────────────────────────────── */}
       {allTags.length > 0 && (
         <div className="px-6 sm:px-10 pb-3">
-          {/* Toggle row */}
           <button
             type="button"
             onClick={() => setTagsOpen(v => !v)}
@@ -561,7 +669,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
                 ? (
                   <span className="flex items-center gap-1.5">
                     <span>Tags</span>
-                    {/* Colour dots for selected tags */}
                     {note.tags.slice(0, 5).map(t => (
                       <span
                         key={t.id}
@@ -570,16 +677,13 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
                         title={t.name}
                       />
                     ))}
-                    {note.tags.length > 5 && (
-                      <span>+{note.tags.length - 5}</span>
-                    )}
+                    {note.tags.length > 5 && <span>+{note.tags.length - 5}</span>}
                   </span>
                 )
                 : 'Add tags'
             )}
           </button>
 
-          {/* Expandable grid */}
           <div
             id="note-tag-picker"
             role="region"
@@ -640,7 +744,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         </div>
       )}
 
-      {/* Prose styles scoped to the .notes-editor ProseMirror instance */}
+      {/* ── Editor styles ─────────────────────────────────────────────────── */}
       <style jsx global>{`
         .notes-editor h1 {
           font-size: 1.75rem;
@@ -683,6 +787,31 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, allTags, onUpdate, showRe
         }
         .notes-editor em {
           font-style: italic;
+        }
+
+        /* Highlight marks */
+        .notes-editor mark {
+          border-radius: 3px;
+          padding: 0 2px;
+          /* color is inherited so text stays legible on any bg */
+        }
+
+        /* Pasted / inserted images */
+        .notes-editor .note-img,
+        .notes-editor img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
+          margin: 0.75rem 0;
+          display: block;
+          /* Subtle ring so images don't float invisibly on white */
+          box-shadow: 0 0 0 1px var(--tm-border-subtle);
+        }
+
+        /* Selected image state */
+        .notes-editor img.ProseMirror-selectednode {
+          outline: 2px solid var(--tm-accent);
+          outline-offset: 2px;
         }
       `}</style>
     </div>
