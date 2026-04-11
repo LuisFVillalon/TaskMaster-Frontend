@@ -31,7 +31,7 @@ These variables are used to render the UI components and handle user interaction
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
-import { claimOrphanedData, fetchWorkBlocks, updateWorkBlockStatus } from '@/app/lib/backend-api';
+import { claimOrphanedData, fetchWorkBlocks, updateWorkBlockStatus, deleteWorkBlock, rescheduleWorkBlock } from '@/app/lib/backend-api';
 import { requestScheduleSuggestion } from '@/app/lib/ai-api';
 import { Task, WorkBlock } from '@/app/types/task';
 import { useTasks, useTags } from '@/app/hooks/useTasksAndTags';
@@ -46,7 +46,7 @@ import NewTaskModal from '@/app/components/task/NewTaskModal';
 import EditTaskModal from '@/app/components/task/EditTaskModal';
 import CreateTagModal from '@/app/components/tag/CreateTagModal';
 import EditTagModal from '@/app/components/tag/EditTagListModal';
-import { Filter, ChevronDown, ChevronUp, FileText, Settings } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp, FileText, Settings, CheckCircle2, AlertTriangle } from 'lucide-react';
 import BigPictureCalendar from '@/app/components/BigPictureCalendar';
 import CalendarView from '@/app/components/calendar/CalendarView';
 import SettingsModal from '@/app/components/SettingsModal';
@@ -112,6 +112,8 @@ const TaskManager: React.FC = () => {
 
   // ── Work Blocks (Smart Scheduling) ──────────────────────────────────────────
   const [workBlocks, setWorkBlocks] = useState<WorkBlock[]>([]);
+  const [workBlockConfirmedToast, setWorkBlockConfirmedToast] = useState(false);
+  const [deadlineWarningToast, setDeadlineWarningToast] = useState<string | null>(null);
 
   useEffect(() => {
     fetchWorkBlocks().then(setWorkBlocks).catch(() => {/* non-critical */});
@@ -124,15 +126,65 @@ const TaskManager: React.FC = () => {
   };
 
   const handleWorkBlockAction = async (id: number, status: 'confirmed' | 'dismissed') => {
+    if (status === 'dismissed') {
+      // Optimistic: remove from state immediately so both the task row and
+      // calendar card disappear without waiting for the network round-trip.
+      setWorkBlocks(prev => prev.filter(b => b.id !== id));
+      try {
+        await updateWorkBlockStatus(id, status);
+      } catch {
+        // Restore state on failure by re-fetching the authoritative list.
+        fetchWorkBlocks().then(setWorkBlocks).catch(() => {});
+      }
+    } else {
+      try {
+        const updated = await updateWorkBlockStatus(id, status);
+        setWorkBlocks(prev => prev.map(b => b.id === id ? updated : b));
+        setWorkBlockConfirmedToast(true);
+        setTimeout(() => setWorkBlockConfirmedToast(false), 2500);
+      } catch {
+        // non-critical — block stays in current state
+      }
+    }
+  };
+
+  const handleRescheduleWorkBlock = (id: number, startTime: string, endTime: string) => {
+    // Optimistic: move the block in state immediately so the calendar
+    // reflects the drop without waiting for the server round-trip.
+    setWorkBlocks(prev =>
+      prev.map(b => b.id === id ? { ...b, start_time: startTime, end_time: endTime } : b),
+    );
+
+    // Deadline check: warn if the new slot falls after the task's due_date.
+    const block = workBlocks.find(b => b.id === id);
+    if (block) {
+      const task = tasks.find(t => t.id === block.task_id);
+      if (task?.due_date) {
+        const newDay  = new Date(startTime);
+        const deadline = new Date(task.due_date as string);
+        // Compare calendar dates only (ignore time component of due_date).
+        deadline.setHours(23, 59, 59, 999);
+        if (newDay > deadline) {
+          const msg = `Work block moved past "${task.title}" deadline — consider updating the due date.`;
+          setDeadlineWarningToast(msg);
+          setTimeout(() => setDeadlineWarningToast(null), 5000);
+        }
+      }
+    }
+
+    rescheduleWorkBlock(id, startTime, endTime)
+      .then(updated => setWorkBlocks(prev => prev.map(b => b.id === id ? updated : b)))
+      .catch(() => fetchWorkBlocks().then(setWorkBlocks).catch(() => {}));
+  };
+
+  const handleDeleteWorkBlock = async (id: number) => {
+    // Optimistic: remove from calendar state immediately so there is no
+    // "ghost" event sitting on the calendar while the DELETE is in-flight.
+    setWorkBlocks(prev => prev.filter(b => b.id !== id));
     try {
-      const updated = await updateWorkBlockStatus(id, status);
-      setWorkBlocks(prev =>
-        status === 'dismissed'
-          ? prev.filter(b => b.id !== id)
-          : prev.map(b => b.id === id ? updated : b),
-      );
+      await deleteWorkBlock(id);
     } catch {
-      // non-critical — block stays in current state
+      fetchWorkBlocks().then(setWorkBlocks).catch(() => {});
     }
   };
 
@@ -282,7 +334,7 @@ const TaskManager: React.FC = () => {
           </div>
 
           {/* Daily Briefing */}
-          <BriefingCard tasks={tasks} notes={allNotes} />
+          <BriefingCard />
 
           {/* Academic Calendar & Stats Cards - Mobile Responsive */}
           <div className='grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6'>
@@ -418,6 +470,14 @@ const TaskManager: React.FC = () => {
                           state.setShowEditTaskModal({ status: true, task })
                         }
                         onScheduleTask={handleScheduleTask}
+                        workBlock={
+                          // Prefer a confirmed block over a suggested one if both exist.
+                          workBlocks.find(b => b.task_id === task.id && b.status === 'confirmed')
+                          ?? workBlocks.find(b => b.task_id === task.id)
+                          ?? null
+                        }
+                        onWorkBlockAction={handleWorkBlockAction}
+                        onDeleteWorkBlock={handleDeleteWorkBlock}
                       />
                     ))}
                   </div>
@@ -470,6 +530,7 @@ const TaskManager: React.FC = () => {
                   onSync={gcalStatus === 'connected' ? syncGcal : undefined}
                   workBlocks={workBlocks}
                   onWorkBlockAction={handleWorkBlockAction}
+                  onWorkBlockReschedule={handleRescheduleWorkBlock}
                 />
               </div>
             </div>
@@ -561,6 +622,28 @@ const TaskManager: React.FC = () => {
         event={activeGoogleEvent}
         onClose={() => setActiveGoogleEvent(null)}
       />
+
+      {/* ── Work block confirmed toast ──────────────────────────────────── */}
+      {workBlockConfirmedToast && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-xl pointer-events-none"
+          style={{ backgroundColor: '#059669', color: '#fff' }}
+        >
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          Work block added to your calendar!
+        </div>
+      )}
+
+      {/* ── Deadline overrun warning toast ──────────────────────────────── */}
+      {deadlineWarningToast && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-xl pointer-events-none max-w-sm text-center"
+          style={{ backgroundColor: 'var(--tm-warning)', color: '#fff' }}
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          {deadlineWarningToast}
+        </div>
+      )}
 
     </>
   );

@@ -1,66 +1,50 @@
-import { Task, WorkBlock } from "../types/task";
-import { Note } from "../types/notes";
 import { toLocalDateStr } from "../utils/dateUtils";
 import { supabase } from "./supabase";
 const API_AI_URL = process.env.NEXT_PUBLIC_TASKMASTER_AI_URL!;
 
 // ── Daily Briefing ────────────────────────────────────────────────────────────
 
-// Cache key is namespaced by user ID so multiple accounts on the same browser
-// never share a cached briefing.
-const briefingCacheKey = (userId: string) => `taskmaster_daily_briefing_${userId}`;
+// Cache key is namespaced by the real Supabase user ID so multiple accounts on
+// the same browser never share a cached briefing.
+const briefingCacheKey = (userId: string) => `taskmaster_daily_briefing_v4_${userId}`;
+
+/**
+ * Structured briefing response returned by the AI service.
+ * Rendered as three visually distinct sections in BriefingCard.
+ */
+export interface DailyBriefingResult {
+  /** 2–3 sentence overall day-load assessment. */
+  pulse: string;
+  /** 3–5 sentence chronological narrative connecting events, blocks, and deadlines. */
+  timeline: string;
+  /** One actionable string per at-risk task that still needs scheduling. */
+  action_items: string[];
+}
 
 interface BriefingCache {
   date: string;   // "YYYY-MM-DD"
-  briefing: string;
-}
-
-/** Enriched task shape sent to the AI briefing endpoint. */
-interface BriefingTask {
-  id: number;
-  title: string;
-  completed: boolean;
-  urgent: boolean;
-  due_date: string | null;
-  tags: { id: number; name: string; color: string }[];
-  /** Derived from urgent + complexity: 'high' | 'medium-high' | 'normal' */
-  priority_level: 'high' | 'medium-high' | 'normal';
-  category?: string | null;
-  complexity?: number | null;
-}
-
-/** Enriched note shape sent to the AI briefing endpoint. */
-interface BriefingNote {
-  id: number;
-  title: string;
-  /** Raw note body (Tiptap HTML) so the AI can match it to tasks. */
-  note_content: string;
-  tags: { id: number; name: string; color: string }[];
-  updated_date: string;
-}
-
-function toPriorityLevel(task: Task): BriefingTask['priority_level'] {
-  if (task.urgent) return 'high';
-  if ((task.complexity ?? 0) >= 4) return 'medium-high';
-  return 'normal';
+  briefing: DailyBriefingResult;
 }
 
 /**
- * Generate a 3-4 sentence strategic daily briefing from the user's tasks and notes.
- * The response is cached in localStorage for the current calendar day so the
- * LLM is only called once per day per browser session.
+ * Request a structured daily briefing from the AI service.
  *
- * Pass `forceRefresh = true` to bypass the cache (e.g., from a Refresh button).
+ * The service now fetches all data itself (tasks, work blocks, calendar events,
+ * notes) using the forwarded Supabase JWT — the frontend only needs to provide
+ * authentication.  This removes the risk of stale props and ensures the briefing
+ * always reflects the live state of the user's data.
+ *
+ * The result is cached in localStorage for the current calendar day so the LLM
+ * is only called once per day.  Pass `forceRefresh = true` to bypass the cache.
  */
 export async function generateDailyBriefing(
-  tasks: Task[],
-  notes: Note[],
   forceRefresh = false,
-  userId = 'default',
-): Promise<string> {
-  // Use local date (not UTC) so the cache key never drifts on US West Coast etc.
-  const now = new Date();
-  const today = toLocalDateStr(now);
+): Promise<DailyBriefingResult> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
+
+  const userId   = session.user.id;
+  const today    = toLocalDateStr(new Date());
   const cacheKey = briefingCacheKey(userId);
 
   if (!forceRefresh) {
@@ -75,36 +59,23 @@ export async function generateDailyBriefing(
     }
   }
 
-  const briefingTasks: BriefingTask[] = tasks.map(t => ({
-    id: t.id,
-    title: t.title,
-    completed: t.completed,
-    urgent: t.urgent,
-    // Timezone-safe: avoid new Date().toISOString() which converts to UTC
-    due_date: t.due_date ? toLocalDateStr(t.due_date) : null,
-    tags: t.tags,
-    priority_level: toPriorityLevel(t),
-    category: t.category ?? null,
-    complexity: t.complexity ?? null,
-  }));
-
-  const briefingNotes: BriefingNote[] = notes.map(n => ({
-    id: n.id,
-    title: n.title,
-    note_content: n.content,
-    tags: n.tags,
-    updated_date: n.updated_date,
-  }));
+  // Detect the browser's IANA timezone (e.g. "America/Los_Angeles") so the
+  // server can localise all timestamp labels before they reach the LLM.
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const res = await fetch(`${API_AI_URL}/daily-briefing`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tasks: briefingTasks, notes: briefingNotes }),
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'X-Timezone':    userTimezone,
+    },
+    body: '{}',   // server fetches all data itself
   });
 
   if (!res.ok) throw new Error('Failed to generate daily briefing');
 
-  const { briefing } = await res.json();
+  const { briefing } = await res.json() as { briefing: DailyBriefingResult };
 
   try {
     localStorage.setItem(cacheKey, JSON.stringify({ date: today, briefing }));
@@ -112,7 +83,7 @@ export async function generateDailyBriefing(
     // Ignore storage quota errors
   }
 
-  return briefing as string;
+  return briefing;
 }
 
 // ── Learning Resources ────────────────────────────────────────────────────────

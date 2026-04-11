@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Task, WorkBlock } from '@/app/types/task';
 import { GoogleCalendarEvent } from '@/app/types/calendar';
 import { formatTime12Hour } from '@/app/utils/taskUtils';
@@ -21,6 +21,7 @@ interface WeekViewProps {
   onGoogleEventClick?: (event: GoogleCalendarEvent) => void;
   workBlocks?: WorkBlock[];
   onWorkBlockAction?: (id: number, status: 'confirmed' | 'dismissed') => void;
+  onWorkBlockReschedule?: (id: number, startTime: string, endTime: string) => void;
 }
 
 const toDateKey = (date: Date): string =>
@@ -67,10 +68,18 @@ const WeekView: React.FC<WeekViewProps> = ({
   onGoogleEventClick,
   workBlocks = [],
   onWorkBlockAction,
+  onWorkBlockReschedule,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const today = new Date();
   const currentHour = today.getHours();
+
+  // ── Drag-and-drop state ─────────────────────────────────────────────────
+  // Tracks which day-hour cell the user is currently hovering over while
+  // dragging a work block, so we can highlight it as a drop target.
+  const [dragOverSlot, setDragOverSlot] = useState<{ dateKey: string; hour: number } | null>(null);
+  // Prevents the slot's onClick (open new-task modal) from firing after a drop.
+  const justDropped = useRef(false);
 
   const weekDays = useMemo(() => {
     const start = new Date(currentDate);
@@ -250,25 +259,62 @@ const WeekView: React.FC<WeekViewProps> = ({
                 const hourBlocks = workBlocksByDate[key]?.[hour]       ?? [];
                 const isTodayCol = isSameDay(day, today);
 
+                const isDragTarget = dragOverSlot?.dateKey === key && dragOverSlot?.hour === hour;
                 return (
                   <div
                     key={key}
-                    onClick={() => onSlotClick(day, `${String(hour).padStart(2, '0')}:00`)}
+                    onClick={() => {
+                      if (justDropped.current) { justDropped.current = false; return; }
+                      onSlotClick(day, `${String(hour).padStart(2, '0')}:00`);
+                    }}
+                    onDragOver={e => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDragOverSlot({ dateKey: key, hour });
+                    }}
+                    onDragLeave={e => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        setDragOverSlot(null);
+                      }
+                    }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragOverSlot(null);
+                      justDropped.current = true;
+                      try {
+                        const { blockId, durationMs } = JSON.parse(
+                          e.dataTransfer.getData('application/json'),
+                        ) as { blockId: number; durationMs: number };
+                        const newStart = new Date(day);
+                        newStart.setHours(hour, 0, 0, 0);
+                        const newEnd = new Date(newStart.getTime() + durationMs);
+                        onWorkBlockReschedule?.(blockId, newStart.toISOString(), newEnd.toISOString());
+                      } catch {
+                        // Malformed drag data — ignore.
+                      }
+                    }}
                     className="border-l border-border-subtle p-0.5 cursor-pointer transition-colors overflow-hidden relative"
                     style={{
                       minHeight: `${SLOT_HEIGHT}px`,
                       maxHeight: `${SLOT_HEIGHT}px`,
-                      backgroundColor: isTodayCol
-                        ? isCurrentHour
-                          ? 'color-mix(in srgb, var(--tm-accent) 18%, transparent)'
-                          : 'color-mix(in srgb, var(--tm-accent) 6%, transparent)'
-                        : undefined,
+                      backgroundColor: isDragTarget
+                        ? 'color-mix(in srgb, var(--tm-accent) 20%, transparent)'
+                        : isTodayCol
+                          ? isCurrentHour
+                            ? 'color-mix(in srgb, var(--tm-accent) 18%, transparent)'
+                            : 'color-mix(in srgb, var(--tm-accent) 6%, transparent)'
+                          : undefined,
+                      outline: isDragTarget ? `2px dashed ${WORK_BLOCK_CONFIRMED}` : undefined,
+                      outlineOffset: '-2px',
                     }}
                     onMouseEnter={e => {
+                      if (dragOverSlot) return;
                       (e.currentTarget as HTMLDivElement).style.backgroundColor =
                         'color-mix(in srgb, var(--tm-accent) 10%, transparent)';
                     }}
                     onMouseLeave={e => {
+                      if (dragOverSlot) return;
                       (e.currentTarget as HTMLDivElement).style.backgroundColor = isTodayCol
                         ? isCurrentHour
                           ? 'color-mix(in srgb, var(--tm-accent) 18%, transparent)'
@@ -300,19 +346,37 @@ const WeekView: React.FC<WeekViewProps> = ({
                         </div>
                       ))}
                       {hourBlocks.map(wb => {
-                        const color = wb.status === 'confirmed' ? WORK_BLOCK_CONFIRMED : WORK_BLOCK_SUGGESTED;
-                        const title = taskMap[wb.task_id] ?? 'AI Work Block';
+                        const color     = wb.status === 'confirmed' ? WORK_BLOCK_CONFIRMED : WORK_BLOCK_SUGGESTED;
+                        const title     = taskMap[wb.task_id] ?? 'AI Work Block';
+                        const confirmed = wb.status === 'confirmed';
                         return (
                           <div
                             key={wb.id}
+                            draggable={confirmed}
+                            onDragStart={e => {
+                              const durationMs =
+                                new Date(wb.end_time).getTime() - new Date(wb.start_time).getTime();
+                              e.dataTransfer.setData(
+                                'application/json',
+                                JSON.stringify({ blockId: wb.id, durationMs }),
+                              );
+                              e.dataTransfer.effectAllowed = 'move';
+                              // Prevent the slot's onDragOver from immediately
+                              // treating the source slot as a drop target.
+                              e.stopPropagation();
+                            }}
+                            onDragEnd={() => setDragOverSlot(null)}
                             onClick={e => e.stopPropagation()}
                             style={{
                               borderColor: color,
                               color,
-                              border: `2px ${wb.status === 'confirmed' ? 'solid' : 'dashed'} ${color}`,
+                              border: `2px ${confirmed ? 'solid' : 'dashed'} ${color}`,
+                              cursor: confirmed ? 'grab' : 'default',
                             }}
                             className="text-[10px] px-1 py-0.5 rounded mb-0.5 w-full"
-                            title={`${title} — ${wb.ai_reasoning}`}
+                            title={confirmed
+                              ? `Drag to reschedule · ${title} — ${wb.ai_reasoning}`
+                              : `${title} — ${wb.ai_reasoning}`}
                           >
                             <div className="flex items-center justify-between gap-0.5">
                               <span className="truncate flex-1">{title}</span>

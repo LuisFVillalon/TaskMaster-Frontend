@@ -14,7 +14,7 @@ These variables are used to display task information and handle user interaction
 */
 
 import React, { useState } from 'react';
-import { Check, Clock, AlertCircle, Trash2, Pencil, BarChart3, Calendar, CalendarClock, Loader2 } from 'lucide-react';
+import { Check, Clock, AlertCircle, Trash2, Pencil, BarChart3, Calendar, CalendarClock, Loader2, CheckCircle2, X, CalendarX2 } from 'lucide-react';
 import { Task, WorkBlock } from '@/app/types/task';
 import { getDueColor, getDurationColor, getComplexityColor, formatTime12Hour, formatDueDate } from '@/app/utils/taskUtils';
 
@@ -25,11 +25,20 @@ interface TaskItemProps {
   tags: Array<{ id: number; name: string; color: string }>;
   onDeleteTask?: (task: Task) => void;
   onEditTaskClick?: (params: { status: boolean; task: Task }) => void;
-  /** Called when the user clicks "Find Best Time". Parent handles the API call and returns the created WorkBlock. */
-  onScheduleTask?: (task: Task) => Promise<WorkBlock>;
+  /** Called when the user clicks "Find Best Time". Parent manages the returned WorkBlock in state. */
+  onScheduleTask?: (task: Task) => Promise<void>;
+  /** The active work block for this task, if one exists (from parent state). */
+  workBlock?: WorkBlock | null;
+  /** Called when the user accepts or dismisses a suggested work block. */
+  onWorkBlockAction?: (id: number, status: 'confirmed' | 'dismissed') => void;
+  /** Called when the user removes a confirmed work block from the calendar. */
+  onDeleteWorkBlock?: (id: number) => void;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags, onDeleteTask, onEditTaskClick, onScheduleTask }) => {
+const TaskItem: React.FC<TaskItemProps> = ({
+  task, index, onToggleComplete, tags, onDeleteTask, onEditTaskClick,
+  onScheduleTask, workBlock = null, onWorkBlockAction, onDeleteWorkBlock,
+}) => {
   const handleDeleteTask = (taskToDelete: Task) => {
     onDeleteTask?.(taskToDelete);
   };
@@ -37,18 +46,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
     onEditTaskClick?.({ status, task: taskToEdit });
   };
 
+  // UI-only state: loading spinner and error message while the schedule request
+  // is in-flight.  The actual WorkBlock data lives in the parent's workBlocks
+  // state and is passed back down via the workBlock prop.
   const [scheduling, setScheduling] = useState(false);
-  const [scheduledBlock, setScheduledBlock] = useState<WorkBlock | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   const handleScheduleClick = async () => {
     if (!onScheduleTask) return;
     setScheduling(true);
     setScheduleError(null);
-    setScheduledBlock(null);
     try {
-      const block = await onScheduleTask(task);
-      setScheduledBlock(block);
+      await onScheduleTask(task);
+      // Parent updates workBlocks state → TaskItem re-renders with new workBlock prop.
     } catch (e) {
       setScheduleError(e instanceof Error ? e.message : 'Scheduling failed');
     } finally {
@@ -215,31 +225,95 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, index, onToggleComplete, tags
 
             {/* Smart Scheduling row */}
             {!task.completed && task.due_date && onScheduleTask && (
-              <div className="mt-3 pt-3 border-t border-border-subtle flex items-center flex-wrap gap-2">
-                <button
-                  onClick={handleScheduleClick}
-                  disabled={scheduling}
-                  className="btn btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-60"
-                >
-                  {scheduling
-                    ? <Loader2 className="w-3 h-3 animate-spin" />
-                    : <CalendarClock className="w-3 h-3" />
-                  }
-                  {scheduling ? 'Finding best time…' : 'Find Best Time'}
-                </button>
-                {scheduledBlock && !scheduleError && (
-                  <span className="text-xs text-text-secondary">
-                    Scheduled {new Date(scheduledBlock.start_time).toLocaleString([], {
-                      weekday: 'short', month: 'short', day: 'numeric',
-                      hour: '2-digit', minute: '2-digit',
-                    })} — check calendar
-                  </span>
+              <div className="mt-3 pt-3 border-t border-border-subtle">
+
+                {!workBlock ? (
+                  /* ── State 1: no block — offer scheduling ──────────────── */
+                  <div className="flex items-center flex-wrap gap-2">
+                    <button
+                      onClick={handleScheduleClick}
+                      disabled={scheduling}
+                      className="btn btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 disabled:opacity-60"
+                    >
+                      {scheduling
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <CalendarClock className="w-3 h-3" />
+                      }
+                      {scheduling ? 'Finding best time…' : 'Find Best Time'}
+                    </button>
+                    {scheduleError && (
+                      <span className="text-xs" style={{ color: 'var(--tm-danger)' }}>
+                        {scheduleError}
+                      </span>
+                    )}
+                  </div>
+
+                ) : workBlock.status === 'suggested' ? (
+                  /* ── State 2: suggested — accept or dismiss ────────────── */
+                  <div className="flex items-center flex-wrap gap-2">
+                    <span
+                      className="chip text-[10px] font-bold uppercase tracking-wide"
+                      style={{ backgroundColor: 'var(--tm-accent-subtle)', color: 'var(--tm-accent)' }}
+                    >
+                      Suggested Time
+                    </span>
+                    <span className="text-xs text-text-secondary">
+                      {new Date(workBlock.start_time).toLocaleString([], {
+                        weekday: 'short', month: 'short', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                      {' – '}
+                      {new Date(workBlock.end_time).toLocaleTimeString([], {
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </span>
+                    <button
+                      onClick={() => onWorkBlockAction?.(workBlock.id, 'confirmed')}
+                      className="btn text-xs px-2.5 py-1 flex items-center gap-1 font-semibold rounded-lg"
+                      style={{ backgroundColor: '#059669', color: '#fff' }}
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => onWorkBlockAction?.(workBlock.id, 'dismissed')}
+                      className="btn btn-secondary text-xs px-2.5 py-1 flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" />
+                      Dismiss
+                    </button>
+                  </div>
+
+                ) : (
+                  /* ── State 3: confirmed — show badge and removal action ── */
+                  <div className="flex items-center flex-wrap gap-2">
+                    <span
+                      className="chip text-[10px] font-bold uppercase tracking-wide flex items-center gap-1"
+                      style={{ backgroundColor: '#d1fae5', color: '#059669' }}
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      Scheduled
+                    </span>
+                    <span className="text-xs text-text-secondary">
+                      {new Date(workBlock.start_time).toLocaleString([], {
+                        weekday: 'short', month: 'short', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                      {' – '}
+                      {new Date(workBlock.end_time).toLocaleTimeString([], {
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </span>
+                    <button
+                      onClick={() => onDeleteWorkBlock?.(workBlock.id)}
+                      className="btn btn-danger-ghost text-xs px-2.5 py-1 flex items-center gap-1"
+                    >
+                      <CalendarX2 className="w-3 h-3" />
+                      Remove from Calendar
+                    </button>
+                  </div>
                 )}
-                {scheduleError && (
-                  <span className="text-xs" style={{ color: 'var(--tm-danger)' }}>
-                    {scheduleError}
-                  </span>
-                )}
+
               </div>
             )}
           </div>

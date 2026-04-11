@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Task, WorkBlock } from '@/app/types/task';
 import { GoogleCalendarEvent } from '@/app/types/calendar';
 import { formatTime12Hour } from '@/app/utils/taskUtils';
@@ -27,6 +27,7 @@ interface DayViewProps {
   onGoogleEventClick?: (event: GoogleCalendarEvent) => void;
   workBlocks?: WorkBlock[];
   onWorkBlockAction?: (id: number, status: 'confirmed' | 'dismissed') => void;
+  onWorkBlockReschedule?: (id: number, startTime: string, endTime: string) => void;
 }
 
 const toDateKey = (date: Date): string =>
@@ -72,11 +73,16 @@ const DayView: React.FC<DayViewProps> = ({
   onGoogleEventClick,
   workBlocks = [],
   onWorkBlockAction,
+  onWorkBlockReschedule,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const today = new Date();
   const currentHour = today.getHours();
   const isToday = isSameDay(currentDate, today);
+
+  // ── Drag-and-drop state ─────────────────────────────────────────────────
+  const [dragOverHour, setDragOverHour] = useState<number | null>(null);
+  const justDropped = useRef(false);
 
   const dayTasks = useMemo(() => {
     const dateKey = toDateKey(currentDate);
@@ -223,22 +229,59 @@ const DayView: React.FC<DayViewProps> = ({
           const isCurrentHour = isToday && currentHour === hour;
           const timeLabel = formatTime12Hour(`${String(hour).padStart(2, '0')}:00`);
 
+          const isDragTarget = dragOverHour === hour;
           return (
             <div
               key={hour}
-              onClick={() => onSlotClick(currentDate, `${String(hour).padStart(2, '0')}:00`)}
+              onClick={() => {
+                if (justDropped.current) { justDropped.current = false; return; }
+                onSlotClick(currentDate, `${String(hour).padStart(2, '0')}:00`);
+              }}
+              onDragOver={e => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setDragOverHour(hour);
+              }}
+              onDragLeave={e => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setDragOverHour(null);
+                }
+              }}
+              onDrop={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragOverHour(null);
+                justDropped.current = true;
+                try {
+                  const { blockId, durationMs } = JSON.parse(
+                    e.dataTransfer.getData('application/json'),
+                  ) as { blockId: number; durationMs: number };
+                  const newStart = new Date(currentDate);
+                  newStart.setHours(hour, 0, 0, 0);
+                  const newEnd = new Date(newStart.getTime() + durationMs);
+                  onWorkBlockReschedule?.(blockId, newStart.toISOString(), newEnd.toISOString());
+                } catch {
+                  // Malformed drag data — ignore.
+                }
+              }}
               className="grid grid-cols-[64px_1fr] border-t border-border-subtle cursor-pointer transition-colors"
               style={{
                 minHeight: `${SLOT_HEIGHT}px`,
-                backgroundColor: isCurrentHour ? 'var(--tm-accent-subtle)' : undefined,
+                backgroundColor: isDragTarget
+                  ? 'color-mix(in srgb, var(--tm-accent) 20%, transparent)'
+                  : isCurrentHour ? 'var(--tm-accent-subtle)' : undefined,
+                outline: isDragTarget ? `2px dashed ${WORK_BLOCK_CONFIRMED}` : undefined,
+                outlineOffset: '-2px',
               }}
               onMouseEnter={e => {
+                if (dragOverHour !== null) return;
                 if (!isCurrentHour) {
                   (e.currentTarget as HTMLDivElement).style.backgroundColor =
                     'var(--tm-surface-raised)';
                 }
               }}
               onMouseLeave={e => {
+                if (dragOverHour !== null) return;
                 if (!isCurrentHour) {
                   (e.currentTarget as HTMLDivElement).style.backgroundColor = '';
                 }
@@ -301,16 +344,35 @@ const DayView: React.FC<DayViewProps> = ({
                   </div>
                 ))}
                 {hourBlocks.map(wb => {
-                  const color = wb.status === 'confirmed' ? WORK_BLOCK_CONFIRMED : WORK_BLOCK_SUGGESTED;
-                  const title = taskMap[wb.task_id] ?? 'AI Work Block';
-                  const endLabel = new Date(wb.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const color     = wb.status === 'confirmed' ? WORK_BLOCK_CONFIRMED : WORK_BLOCK_SUGGESTED;
+                  const title     = taskMap[wb.task_id] ?? 'AI Work Block';
+                  const confirmed = wb.status === 'confirmed';
+                  const endLabel  = new Date(wb.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                   return (
                     <div
                       key={wb.id}
+                      draggable={confirmed}
+                      onDragStart={e => {
+                        const durationMs =
+                          new Date(wb.end_time).getTime() - new Date(wb.start_time).getTime();
+                        e.dataTransfer.setData(
+                          'application/json',
+                          JSON.stringify({ blockId: wb.id, durationMs }),
+                        );
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.stopPropagation();
+                      }}
+                      onDragEnd={() => setDragOverHour(null)}
                       onClick={e => e.stopPropagation()}
-                      style={{ border: `2px ${wb.status === 'confirmed' ? 'solid' : 'dashed'} ${color}`, color }}
+                      style={{
+                        border: `2px ${confirmed ? 'solid' : 'dashed'} ${color}`,
+                        color,
+                        cursor: confirmed ? 'grab' : 'default',
+                      }}
                       className="rounded-xl px-3 py-2"
-                      title={wb.ai_reasoning}
+                      title={confirmed
+                        ? `Drag to reschedule · ${wb.ai_reasoning}`
+                        : wb.ai_reasoning}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">

@@ -21,6 +21,7 @@ import { X, Loader2, Eye, EyeOff, AlertTriangle, ExternalLink, ShieldCheck, Cale
 import { supabase } from '@/app/lib/supabase';
 import { useAuth } from '@/app/context/AuthContext';
 import { updatePassword, deleteAccount, fetchAvailabilityPreferences, createAvailabilityPreference, deleteAvailabilityPreference, type AvailabilityPreference } from '@/app/lib/backend-api';
+import { localWindowToUtc, utcWindowToLocal, getTimezoneAbbr } from '@/app/utils/timezoneUtils';
 import { validatePassword, MIN_LENGTH } from '@/app/lib/passwordValidation';
 import PasswordStrengthMeter from '@/app/components/PasswordStrengthMeter';
 import { type GCalStatus } from '@/app/hooks/useGoogleCalendar';
@@ -169,12 +170,15 @@ export default function SettingsModal({
     setAddingPref(true);
     try {
       // Create one backend entry per selected day (sequential — keeps order deterministic).
+      // Convert each window from local time to UTC before persisting so the
+      // backend and AI gap-finder always operate on UTC HH:MM strings.
       const created: AvailabilityPreference[] = [];
       for (const dow of Array.from(newDows).sort((a, b) => a - b)) {
+        const utc  = localWindowToUtc(dow, newStart, newEnd);
         const pref = await createAvailabilityPreference({
-          day_of_week: dow,
-          start_time:  newStart,
-          end_time:    newEnd,
+          day_of_week: utc.dow,
+          start_time:  utc.start_time,
+          end_time:    utc.end_time,
           label:       newLabel.trim() || null,
         });
         created.push(pref);
@@ -254,12 +258,12 @@ export default function SettingsModal({
   return (
     <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="modal-panel w-full max-w-lg rounded-2xl shadow-xl"
+        className="modal-panel w-full max-w-lg rounded-2xl shadow-xl flex flex-col max-h-[90vh]"
         style={{ backgroundColor: 'var(--tm-surface)', border: '1px solid var(--tm-border)' }}
       >
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <div
-          className="flex items-center justify-between px-6 pt-5 pb-4 border-b"
+          className="flex items-center justify-between px-6 pt-5 pb-4 border-b shrink-0"
           style={{ borderColor: 'var(--tm-border)' }}
         >
           <div>
@@ -285,7 +289,7 @@ export default function SettingsModal({
 
         {/* ── Tab Bar ──────────────────────────────────────────────────────── */}
         <div
-          className="flex gap-1 px-6 py-3 border-b overflow-x-auto scrollbar-custom"
+          className="flex gap-1 px-6 py-3 border-b overflow-x-auto scrollbar-custom shrink-0"
           style={{ borderColor: 'var(--tm-border)', backgroundColor: 'var(--tm-surface-raised)' }}
         >
           <button
@@ -326,7 +330,7 @@ export default function SettingsModal({
           </button>
         </div>
 
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 overflow-y-auto flex-1 scrollbar-custom">
 
           {/* ── Password Tab ─────────────────────────────────────────────── */}
           {section === 'password' && (
@@ -547,7 +551,7 @@ export default function SettingsModal({
                 <p style={{ color: 'var(--tm-text-secondary)' }}>
                   Blackout windows are recurring weekly times the AI will <strong>never</strong> schedule
                   work blocks — gym, class, family time. Supports overnight spans (e.g. 10 PM – 8 AM).
-                  Times are in UTC.
+                  Enter times in <strong>{getTimezoneAbbr()}</strong> (your local timezone).
                 </p>
               </div>
 
@@ -563,7 +567,9 @@ export default function SettingsModal({
               ) : (
                 <ul className="space-y-2 max-h-44 overflow-y-auto scrollbar-custom pr-1">
                   {prefs.map(p => {
-                    const overnight = isOvernight(p.start_time, p.end_time);
+                    // DB stores UTC; convert to the user's local timezone for display.
+                    const local    = utcWindowToLocal(p.day_of_week, p.start_time, p.end_time);
+                    const overnight = isOvernight(local.start_time, local.end_time);
                     return (
                       <li
                         key={p.id}
@@ -576,7 +582,7 @@ export default function SettingsModal({
                           </span>
                           <span className="text-text-muted mx-1.5">·</span>
                           <span style={{ color: 'var(--tm-text-secondary)' }}>
-                            {DAY_NAMES[p.day_of_week]}s {fmt12(p.start_time)} – {fmt12(p.end_time)}
+                            {DAY_NAMES[local.dow]}s {fmt12(local.start_time)} – {fmt12(local.end_time)}
                             {overnight && (
                               <span
                                 className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded"
@@ -660,7 +666,9 @@ export default function SettingsModal({
                 {/* Time range */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1">Start (UTC)</label>
+                    <label className="block text-xs font-medium text-text-muted mb-1">
+                      Start ({getTimezoneAbbr()})
+                    </label>
                     <input
                       type="time"
                       value={newStart}
@@ -670,7 +678,9 @@ export default function SettingsModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-text-muted mb-1">End (UTC)</label>
+                    <label className="block text-xs font-medium text-text-muted mb-1">
+                      End ({getTimezoneAbbr()})
+                    </label>
                     <input
                       type="time"
                       value={newEnd}

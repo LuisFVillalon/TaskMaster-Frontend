@@ -420,6 +420,32 @@ export async function updateWorkBlockStatus(
   return res.json();
 }
 
+/** Move a confirmed work block to a new time via drag-and-drop. */
+export async function rescheduleWorkBlock(
+  id: number,
+  startTime: string,
+  endTime: string,
+): Promise<WorkBlock> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/work-blocks/${id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ start_time: startTime, end_time: endTime }),
+  });
+  await assertOk(res, "rescheduleWorkBlock");
+  return res.json();
+}
+
+/** Hard-delete a work block (e.g. "Remove from Calendar" on a confirmed block). */
+export async function deleteWorkBlock(id: number): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/work-blocks/${id}`, {
+    method: 'DELETE',
+    headers,
+  });
+  await assertOk(res, "deleteWorkBlock");
+}
+
 // ── Google Calendar ───────────────────────────────────────────────────────────
 
 /**

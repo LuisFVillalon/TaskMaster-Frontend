@@ -43,6 +43,8 @@ interface CalendarViewProps {
   workBlocks?: WorkBlock[];
   /** Called when the user accepts or dismisses a suggested work block. */
   onWorkBlockAction?: (id: number, status: 'confirmed' | 'dismissed') => void;
+  /** Called when the user drag-and-drops a confirmed work block to a new time. */
+  onWorkBlockReschedule?: (id: number, startTime: string, endTime: string) => void;
 }
 
 // Compute the ISO 8601 time range that should be fetched for the current view.
@@ -96,6 +98,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   onSync,
   workBlocks = [],
   onWorkBlockAction,
+  onWorkBlockReschedule,
 }) => {
   const { view, setView, currentDate, goToPrev, goToNext, goToToday } = useCalendarState();
 
@@ -205,6 +208,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           onGoogleEventClick={onGoogleEventClick}
           workBlocks={workBlocks}
           onWorkBlockAction={onWorkBlockAction}
+          onWorkBlockReschedule={onWorkBlockReschedule}
         />
       )}
       {view === 'day' && (
@@ -217,6 +221,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           onGoogleEventClick={onGoogleEventClick}
           workBlocks={workBlocks}
           onWorkBlockAction={onWorkBlockAction}
+          onWorkBlockReschedule={onWorkBlockReschedule}
         />
       )}
     </div>
