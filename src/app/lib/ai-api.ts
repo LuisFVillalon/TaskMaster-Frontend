@@ -1,3 +1,4 @@
+import { Task, WorkBlock } from "../types/task";
 import { toLocalDateStr } from "../utils/dateUtils";
 import { supabase } from "./supabase";
 const API_AI_URL = process.env.NEXT_PUBLIC_TASKMASTER_AI_URL!;

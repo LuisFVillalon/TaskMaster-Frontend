@@ -26,7 +26,7 @@ interface TaskItemProps {
   onDeleteTask?: (task: Task) => void;
   onEditTaskClick?: (params: { status: boolean; task: Task }) => void;
   /** Called when the user clicks "Find Best Time". Parent manages the returned WorkBlock in state. */
-  onScheduleTask?: (task: Task) => Promise<void>;
+  onScheduleTask?: (task: Task) => Promise<WorkBlock | void>;
   /** The active work block for this task, if one exists (from parent state). */
   workBlock?: WorkBlock | null;
   /** Called when the user accepts or dismisses a suggested work block. */
